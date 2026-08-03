@@ -79,12 +79,16 @@ both **ingests page content** and **takes actions**, and the page can drive both
   remove host process launch. (`attach_node` only connects to an already-running
   process, but still grants full debugger control — including `evaluate` — over
   it.)
-- **Filesystem reach.** Three tools take a caller-supplied path that is **not**
-  validated, normalized, or scoped: `screenshot path=` and
-  `export_storage_state path=` write, and `load_storage_state path=` reads. A
-  steered agent can therefore write or read any path the server process can.
-  There is also a **fourth, indirect read route with no `path=` argument at
-  all**: `navigate` applies no URL-scheme restriction, so
+- **Filesystem reach.** Beyond the `chrome_path` executable selection above,
+  several inputs accept caller-supplied filesystem locations that are **not**
+  validated, normalized, or scoped. `screenshot path=` and
+  `export_storage_state path=` write caller-selected files, while
+  `load_storage_state path=` reads one. `launch_chrome user_data_dir=` asks
+  Chrome to create and write its profile tree in a caller-selected directory;
+  unlike the `path=` tools, that write uses Chrome's own profile layout rather
+  than arbitrary caller-selected contents or filenames. Separately, `navigate`
+  has an **indirect read route with no `path=` argument at all**: it applies no
+  URL-scheme restriction, so
   `navigate("file:///…")` followed by `evaluate` reads any file the *browser*
   process can — under agent control, the browser is a general-purpose file
   reader. The page-scoped/host-scoped partition above does not survive
@@ -120,8 +124,8 @@ These are deployment-side controls; the server does not apply them for you.
   write-only restriction does not protect credentials or SSH keys that the
   browser process can read. An attached browser does not inherit the server's
   containment; confine that process separately.
-- **Throwaway browser profile.** Use a disposable `userDataDir` rather than a
-  real browser profile.
+- **Throwaway browser profile.** Pass `launch_chrome user_data_dir=` pointing to
+  a disposable directory rather than a real browser profile.
 - **No ambient credentials.** Do not run the server where its process env or
   instance role carries cloud/API credentials the agent shouldn't have — doubly
   load-bearing because a `launch_node` child inherits that env directly. Block the

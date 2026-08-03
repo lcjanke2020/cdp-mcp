@@ -62,6 +62,7 @@
     "sample-fullstack:build": "npm ci --prefix examples/sample-fullstack-app && npm run --prefix examples/sample-fullstack-app api:build",
     "variants:build": "node scripts/build-variants.mjs",
     "lint:chromium-skips": "node scripts/check-chromium-skips.mjs",
+    "release:check-tag": "tsx scripts/check-release-tag.ts",
     "smoke": "node scripts/smoke.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.evals.json && tsc -p tsconfig.test.json",
     "preeval": "npm run build && npm run sample-node:build && npm run sample-fullstack:build",

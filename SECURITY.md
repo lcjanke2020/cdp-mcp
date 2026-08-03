@@ -113,10 +113,13 @@ These are deployment-side controls; the server does not apply them for you.
   [docs/chromium-sandboxing.md](./docs/chromium-sandboxing.md) for the mechanics
   and the important caveat that an outer sandbox does **not** replace Chromium's
   own renderer sandbox.
-- **Scope the writable filesystem.** Because the `path=` tools are unscoped, run
-  the server with a restricted writable FS (container mount, Bubblewrap bind, or
-  a dedicated low-privilege user) so those writes/reads cannot escape an intended
-  directory or reach credentials and SSH keys.
+- **Scope readable and writable filesystem access.** Because both the `path=`
+  tools and unrestricted `file://` navigation are unscoped, give the server and
+  any browser it launches a restricted filesystem view (container mount
+  allowlist, Bubblewrap bind policy, or a dedicated low-privilege user). A
+  write-only restriction does not protect credentials or SSH keys that the
+  browser process can read. An attached browser does not inherit the server's
+  containment; confine that process separately.
 - **Throwaway browser profile.** Use a disposable `userDataDir` rather than a
   real browser profile.
 - **No ambient credentials.** Do not run the server where its process env or

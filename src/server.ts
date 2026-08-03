@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { createRequire } from "node:module";
 import { registerSessionTools } from "./tools/session.js";
 import { registerNavTools } from "./tools/nav.js";
 import { registerSourceTools } from "./tools/source.js";
@@ -13,10 +14,14 @@ import { registerStorageTools } from "./tools/storage.js";
 import { registerNodeOutputTools } from "./tools/node-output.js";
 import { registerTimelineTools } from "./tools/timeline.js";
 
+const packageMetadata = createRequire(import.meta.url)("../package.json") as {
+  version: string;
+};
+
 export function buildServer(): McpServer {
   const server = new McpServer({
     name: "lynceus",
-    version: "0.4.0",
+    version: packageMetadata.version,
   });
 
   registerSessionTools(server);

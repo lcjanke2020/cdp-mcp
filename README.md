@@ -14,7 +14,7 @@ Designed for agents running in CLIs (Claude Code, GitHub Copilot CLI) that have 
 
 **Status:** alpha. **License:** [MIT](./LICENSE). Releases are published to npm by CI via [OIDC trusted publishing](https://docs.npmjs.com/generating-provenance-statements) — no long-lived npm token exists — with a provenance attestation linking the published tarball to the exact commit and workflow run that built it.
 
-**Last updated: 2026-07-20**
+**Last updated: 2026-08-03**
 
 ## Install
 
@@ -26,6 +26,8 @@ lynceus                           # stdio MCP transport (the default clients exp
 ```
 
 The npm package ships prebuilt `dist/`, so there is no build step for runtime use. If `launch_chrome` cannot find Chrome/Chromium automatically, set `CHROME_PATH` to the browser binary.
+
+> **Published 0.4.0 vs this README:** the multi-session tools documented below (`list_sessions`, `session` routing, `get_timeline`, the full-stack walkthrough) are on `master` and **not yet released** — the published `0.4.0` ships 52 tools without them. Use a source checkout (`npm install && npm run build`) for multi-session work until `0.5.0`.
 
 ## Wire into Claude Code
 
@@ -60,9 +62,6 @@ Or via `~/.claude.json`:
 ```
 
 ## Demo walkthrough
-
-<!-- LEO-453: demo gif/asciinema of the breakpoint → pause → inspect flow embeds here,
-     restoring this section's 60-second-demo framing. -->
 
 The walkthroughs below use the repo's intentionally-buggy sample apps — but any localhost app of your own works the same way.
 
@@ -221,7 +220,8 @@ The test pyramid has four layers (see [docs/test-eval-plan.md](docs/test-eval-pl
 
 ```sh
 npm test              # L1 unit + L2 tool-contract (fake CDP) + L4 harness-unit tests — seconds, no browser, no LLM
-npm run typecheck     # both tsconfigs — CI gates on this
+npm run typecheck     # all three tsconfigs (src, evals, tests) — CI gates on this
+npm run test:coverage # production src coverage report (no threshold yet)
 npm run smoke         # stdio protocol smoke, no browser — CI gates on this
 npm run test:e2e      # L3: real headless Chromium + real Node Inspector, 20 specs
 npm run eval:quick    # L4: 1 LLM-agent scenario × 1 trial (needs ANTHROPIC_API_KEY; ~$0.50–2 at the default Opus-4.8-medium)
@@ -241,7 +241,17 @@ If `lynceus` doesn't fit your workflow, look at:
 - [`ScriptedAlchemy/devtools-debugger-mcp`](https://github.com/ScriptedAlchemy/devtools-debugger-mcp) (Node-focused)
 - [`ChromeDevTools/chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) (automation + console, no breakpoints)
 
+## Non-goals (and what we dropped)
+
+Decisions, not omissions — each of these was considered and deliberately not built:
+
+- **Session *recording*.** Playwright's recorder (and the Playwright MCP server) already turns a live browser session into a replayable script; rebuilding capture inside a debugger server would duplicate a mature tool without adding debugging value. lynceus starts where a recording stops — at the live, paused runtime.
+- **Deterministic *replay* of recorded sessions.** Still wanted, but scoped down from "replay anything" to the slice a debugger actually needs: capturing a bug reproduction as an artifact an agent can re-run while setting breakpoints. **Not built yet** — nothing in this repo records or replays sessions today.
+- **General browser automation as a product surface.** The navigation/click/type tools exist to *reach* a bug, not to compete with the automation-first MCP servers listed under [Prior art](#prior-art).
+
 ## Out of scope for v1
+
+These are deferred platform and topology boundaries, distinct from the deliberate build-vs-adopt decisions above:
 
 Firefox / Safari, `Storage.*`, `Tracing.*`, `HeapProfiler.*`, concurrent multi-page debugging, and multi-process Node (Worker threads / `cluster` children — Worker-domain auto-attach is deferred per [`docs/node-session-design.md`](docs/node-session-design.md) §9). Single-process Node debugging **is** in scope via `attach_node` / `launch_node`.
 

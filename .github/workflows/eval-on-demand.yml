@@ -5,7 +5,7 @@
 #
 # Gating:
 #   - workflow_dispatch only: this eval spends real API budget, so it runs
-#     when an operator explicitly triggers it (Actions -> eval-nightly ->
+#     when an operator explicitly triggers it (Actions -> eval-on-demand ->
 #     Run workflow), never on a schedule. To run it on a nightly cron, add a
 #     `schedule:` trigger below — that is a deliberate, cost-incurring opt-in,
 #     not a default that ships enabled.
@@ -19,7 +19,7 @@
 # Budget: each run reads EVAL_BUDGET_USD (default from evals/harness/model.ts).
 # Override per-run via the budget_usd workflow input below.
 
-name: eval-nightly
+name: eval-on-demand
 
 on:
   workflow_dispatch:
@@ -41,12 +41,14 @@ on:
         default: "100"
 
 concurrency:
-  group: eval-nightly
+  group: eval-on-demand
   cancel-in-progress: false # do NOT cancel; let a previous run finish
 
 jobs:
   eval:
-    name: full eval (default model × 3 trials × all scenarios)
+    # A missing secret still yields a green job, so carry the caveat in the
+    # check name and emit an annotation + summary on the skip path below.
+    name: full eval (default model × 3 trials × all scenarios — SKIPS GREEN without ANTHROPIC_API_KEY)
     runs-on: ubuntu-24.04-arm # match L3 primary target so Chromium is consistent
     timeout-minutes: 60
 
@@ -59,7 +61,8 @@ jobs:
           KEY_PRESENT: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         run: |
           if [ "$KEY_PRESENT" != "true" ]; then
-            echo "ANTHROPIC_API_KEY is not set on this repo. Skipping eval — set the secret in repo settings to enable."
+            echo "::warning title=eval-on-demand SKIPPED::ANTHROPIC_API_KEY is not set on this repo — this green is a SKIP, not an eval pass. Set the secret in repo settings to enable."
+            echo "## ⚠️ eval-on-demand SKIPPED (no ANTHROPIC_API_KEY) — green = skip, not pass" >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"

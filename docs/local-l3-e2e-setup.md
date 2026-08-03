@@ -1,6 +1,6 @@
 # Local L3 e2e setup (Playwright Chromium + AppArmor)
 
-**Last updated: 2026-06-09**
+**Last updated: 2026-07-14**
 
 A step-by-step runbook for getting `npm run test:e2e` (the L3 real-browser
 suite) passing on a local Linux machine **with Chromium's sandbox on**. This is

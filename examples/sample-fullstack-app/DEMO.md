@@ -1,6 +1,6 @@
 # The dual-session cart-bug demo
 
-**Last updated: 2026-07-20** · Target wall time: **≤ 10 minutes** (script budget ~8)
+**Last updated: 2026-08-03** · Target wall time: **≤ 10 minutes** (script budget ~8)
 
 One lynceus server, two debug sessions — a browser and a Node backend — one agent
 breakpointing both sides of the same `fetch`. The story: *"the cart shows 0 items after

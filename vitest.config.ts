@@ -17,5 +17,13 @@ export default defineConfig({
     // ensures `npm test` never tries to launch Chrome and never imports the
     // e2e globalSetup which would fail without a built sample-app.
     exclude: ["test/e2e/**", "node_modules/**", "dist/**"],
+    coverage: {
+      provider: "v8",
+      // Keep the headline denominator meaningful: production server source,
+      // including files no test imports. Eval harnesses and test doubles have
+      // different risk profiles and should not inflate or dilute this number.
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts"],
+    },
   },
 });

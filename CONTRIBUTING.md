@@ -1,6 +1,6 @@
 # Contributing
 
-**Last updated: 2026-07-14**
+**Last updated: 2026-08-03**
 
 Thanks for your interest in lynceus! This is an alpha-stage project; issues and
 PRs are welcome.
@@ -10,9 +10,10 @@ PRs are welcome.
 ```sh
 npm install
 npm run build
-npm test          # L1 unit + L2 tool-contract + L4 harness-unit tests (fast, no browser, no LLM)
-npm run typecheck # both tsconfigs — CI gates on this
-npm run smoke     # stdio protocol smoke, no browser — CI gates on this
+npm test              # L1 unit + L2 tool-contract + L4 harness-unit tests (fast, no browser, no LLM)
+npm run typecheck     # all three tsconfigs (src, evals, tests) — CI gates on this
+npm run test:coverage # production src coverage report (no threshold yet)
+npm run smoke         # stdio protocol smoke, no browser — CI gates on this
 ```
 
 For the end-to-end and eval layers, see [README.md](./README.md) and

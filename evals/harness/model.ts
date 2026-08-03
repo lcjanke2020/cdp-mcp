@@ -229,7 +229,7 @@ export function resolveReasoning(): ReasoningConfig {
     // proposal's analytics value lives in trace richness — running a
     // thinking-capable model with thinking off would waste the run.
     // Budget-style models stay at none-by-default to preserve their
-    // cheap nightly baseline for ad-hoc Sonnet-via-override runs.
+    // cheap comparison baseline for ad-hoc Sonnet-via-override runs.
     if (THINKING_STYLE === "adaptive") {
       return { level: "medium", budgetTokens: TIER_BUDGET_TOKENS.medium };
     }
@@ -694,7 +694,7 @@ export const MAX_OUTPUT_TOKENS_PER_TRIAL = 64_000;
  *  tracks running cost as trials complete and exits early (mid-trial if
  *  necessary) once spend > BUDGET. Operator-chosen for the first real
  *  run; well above empirical full-suite cost (Sonnet 4.6 came in at
- *  ~$5–10/nightly; Opus-4.7-medium first observation was ~$4 — one
+ *  ~$5–10/run; Opus-4.7-medium first observation was ~$4 — one
  *  data point, not a steady-state band), so it only fires on a
  *  genuine surprise (model
  *  deprecation forcing a costlier fallback, cache_control wiring

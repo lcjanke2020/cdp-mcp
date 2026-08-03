@@ -102,15 +102,14 @@ export type ScenarioStatus = "PASS" | "FAIL" | "XFAIL" | "XPASS";
 export interface ScenarioRollup {
   scenario: string;
   trials: number;
-  /** Median correctness — for 3 trials this is 0 (0 or 1 passes), 0.5
-   *  (rounded to 0/1 below), or 1. The plan's gate is "median ≥ 2/3"
-   *  which we encode as the median (passes if at least ceil(N/2) of N
-   *  trials passed). */
-  medianCorrectness: 0 | 1;
-  /** Median mechanic — same shape as medianCorrectness but over the
+  /** Majority correctness — 1 iff strictly more than half of N trials
+   *  passed (2-of-3 for the standard run, 2-of-2 or 3-of-4 for even N).
+   *  This is a majority vote, not a median or a tie-passing threshold. */
+  majorityCorrectness: 0 | 1;
+  /** Majority mechanic — same shape as majorityCorrectness but over the
    *  workflow-exercise bit. Tracks "did the model drive the debugger?"
    *  separately from "did the model find the bug?". */
-  medianMechanic: 0 | 1;
+  majorityMechanic: 0 | 1;
   /** Correctness-axis status taking `xfailCorrectness` into account.
    *  This is what the CLI uses for its exit code and what the
    *  scoreboard prints in the CORRECT column. */
@@ -145,16 +144,36 @@ export interface RollupOpts {
   xfailMechanic?: boolean;
 }
 
+/** Whether a complete set of scenario rollups passes the CLI gate.
+ *
+ * A no-data rollup never passes, including when its scenario is xfail-tagged:
+ * XFAIL describes an observed expected failure, not a trial that never ran.
+ * The expected-count check also makes scenarios omitted after a budget halt
+ * fail the run. */
+export function runPassesGate(
+  rollups: ScenarioRollup[],
+  expectedScenarioCount: number,
+): boolean {
+  return (
+    expectedScenarioCount > 0 &&
+    rollups.length === expectedScenarioCount &&
+    rollups.every((r) => r.trials > 0 && r.status !== "FAIL")
+  );
+}
+
 export function rollupScenario(
   scenarioName: string,
   outcomes: TrialOutcome[],
   opts: RollupOpts = {},
 ): ScenarioRollup {
+  const hasOutcomes = outcomes.length > 0;
+  const requiredPasses = Math.floor(outcomes.length / 2) + 1;
   const passes = outcomes.filter((o) => o.oracle.correctness === 1).length;
-  const medianCorrectness: 0 | 1 = passes >= Math.ceil(outcomes.length / 2) ? 1 : 0;
+  const majorityCorrectness: 0 | 1 =
+    hasOutcomes && passes >= requiredPasses ? 1 : 0;
   const mechanicPasses = outcomes.filter((o) => o.oracle.mechanic === 1).length;
-  const medianMechanic: 0 | 1 =
-    mechanicPasses >= Math.ceil(outcomes.length / 2) ? 1 : 0;
+  const majorityMechanic: 0 | 1 =
+    hasOutcomes && mechanicPasses >= requiredPasses ? 1 : 0;
   const meanEfficiency =
     outcomes.length === 0
       ? 0
@@ -163,25 +182,25 @@ export function rollupScenario(
   const totalCostUsd = outcomes.reduce((s, o) => s + o.costUsd, 0);
   const xfailCorrectness = opts.xfailCorrectness === true;
   const status: ScenarioStatus = xfailCorrectness
-    ? medianCorrectness === 1
+    ? majorityCorrectness === 1
       ? "XPASS"
       : "XFAIL"
-    : medianCorrectness === 1
+    : majorityCorrectness === 1
       ? "PASS"
       : "FAIL";
   const xfailMechanic = opts.xfailMechanic === true;
   const mechanicStatus: ScenarioStatus = xfailMechanic
-    ? medianMechanic === 1
+    ? majorityMechanic === 1
       ? "XPASS"
       : "XFAIL"
-    : medianMechanic === 1
+    : majorityMechanic === 1
       ? "PASS"
       : "FAIL";
   return {
     scenario: scenarioName,
     trials: outcomes.length,
-    medianCorrectness,
-    medianMechanic,
+    majorityCorrectness,
+    majorityMechanic,
     status,
     mechanicStatus,
     xfailCorrectness,
@@ -242,12 +261,12 @@ export function renderScoreboard(rollups: ScenarioRollup[]): string {
     else if (r.status === "XPASS") xpassCount += 1;
     else if (r.status === "FAIL") failCount += 1;
     // Deliberately asymmetric with `passedScenarios`: this counts every
-    // scenario that drove the debugger (`medianMechanic === 1`), so a
+    // scenario that drove the debugger (`majorityMechanic === 1`), so a
     // MECHANIC-column `XPASS!` (xfailMechanic-tagged but the flow ran) counts
     // here, whereas a correctness `XPASS!` is excluded from `passedScenarios`.
     // The mechanic axis is diagnostic-only, so "did it drive the debugger" is
     // the useful tally regardless of the xfail tag.
-    if (r.medianMechanic === 1) mechanicPassed += 1;
+    if (r.majorityMechanic === 1) mechanicPassed += 1;
     const correctDisplay = r.status === "XPASS" ? "XPASS!" : r.status;
     const mechanicDisplay = r.mechanicStatus === "XPASS" ? "XPASS!" : r.mechanicStatus;
     rows.push(

@@ -184,6 +184,26 @@ describe("rollupScenario", () => {
     expect(rollupScenario("s", [outcome(0)]).majorityCorrectness).toBe(0);
   });
 
+  it("requires a strict majority for supported even trial counts", () => {
+    const oneOfTwo = rollupScenario("s", [outcome(1), outcome(0)]);
+    expect(oneOfTwo.majorityCorrectness).toBe(0);
+    expect(oneOfTwo.majorityMechanic).toBe(0);
+    expect(rollupScenario("s", [outcome(1), outcome(1)]).majorityCorrectness).toBe(1);
+
+    const twoOfFour = rollupScenario("s", [
+      outcome(1),
+      outcome(1),
+      outcome(0),
+      outcome(0),
+    ]);
+    expect(twoOfFour.majorityCorrectness).toBe(0);
+    expect(twoOfFour.majorityMechanic).toBe(0);
+    expect(
+      rollupScenario("s", [outcome(1), outcome(1), outcome(1), outcome(0)])
+        .majorityCorrectness,
+    ).toBe(1);
+  });
+
   it("zero trials never produces a passing majority on either axis", () => {
     const r = rollupScenario("s", []);
     expect(r.trials).toBe(0);

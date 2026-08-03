@@ -102,10 +102,9 @@ export type ScenarioStatus = "PASS" | "FAIL" | "XFAIL" | "XPASS";
 export interface ScenarioRollup {
   scenario: string;
   trials: number;
-  /** Majority correctness — 1 iff at least ceil(N/2) of N trials passed
-   *  (2-of-3 for the standard 3-trial run). Note this is a majority vote,
-   *  not a median: on even trial counts a tie counts as a pass, which is
-   *  the optimistic direction. */
+  /** Majority correctness — 1 iff strictly more than half of N trials
+   *  passed (2-of-3 for the standard run, 2-of-2 or 3-of-4 for even N).
+   *  This is a majority vote, not a median or a tie-passing threshold. */
   majorityCorrectness: 0 | 1;
   /** Majority mechanic — same shape as majorityCorrectness but over the
    *  workflow-exercise bit. Tracks "did the model drive the debugger?"
@@ -168,12 +167,13 @@ export function rollupScenario(
   opts: RollupOpts = {},
 ): ScenarioRollup {
   const hasOutcomes = outcomes.length > 0;
+  const requiredPasses = Math.floor(outcomes.length / 2) + 1;
   const passes = outcomes.filter((o) => o.oracle.correctness === 1).length;
   const majorityCorrectness: 0 | 1 =
-    hasOutcomes && passes >= Math.ceil(outcomes.length / 2) ? 1 : 0;
+    hasOutcomes && passes >= requiredPasses ? 1 : 0;
   const mechanicPasses = outcomes.filter((o) => o.oracle.mechanic === 1).length;
   const majorityMechanic: 0 | 1 =
-    hasOutcomes && mechanicPasses >= Math.ceil(outcomes.length / 2) ? 1 : 0;
+    hasOutcomes && mechanicPasses >= requiredPasses ? 1 : 0;
   const meanEfficiency =
     outcomes.length === 0
       ? 0

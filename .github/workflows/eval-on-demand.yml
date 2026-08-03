@@ -46,7 +46,9 @@ concurrency:
 
 jobs:
   eval:
-    name: full eval (default model × 3 trials × all scenarios)
+    # A missing secret still yields a green job, so carry the caveat in the
+    # check name and emit an annotation + summary on the skip path below.
+    name: full eval (default model × 3 trials × all scenarios — SKIPS GREEN without ANTHROPIC_API_KEY)
     runs-on: ubuntu-24.04-arm # match L3 primary target so Chromium is consistent
     timeout-minutes: 60
 
@@ -59,7 +61,8 @@ jobs:
           KEY_PRESENT: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         run: |
           if [ "$KEY_PRESENT" != "true" ]; then
-            echo "ANTHROPIC_API_KEY is not set on this repo. Skipping eval — set the secret in repo settings to enable."
+            echo "::warning title=eval-on-demand SKIPPED::ANTHROPIC_API_KEY is not set on this repo — this green is a SKIP, not an eval pass. Set the secret in repo settings to enable."
+            echo "## ⚠️ eval-on-demand SKIPPED (no ANTHROPIC_API_KEY) — green = skip, not pass" >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"

@@ -1,6 +1,6 @@
 # Security Policy
 
-**Last updated: 2026-07-15**
+**Last updated: 2026-08-03**
 
 ## Reporting a vulnerability
 
@@ -39,10 +39,15 @@ and full read access** on every target it is attached to — and, via
 - **Target trust.** Only attach to browsers/pages you trust. `evaluate` and the
   breakpoint/console/network tools surface page content to the calling agent;
   point it only at content you are authorized to inspect.
-- **Chromium sandboxing.** Some environments require `--no-sandbox` to launch
-  Chromium. Understand the trade-offs in
-  [docs/chromium-sandboxing.md](./docs/chromium-sandboxing.md) before disabling
-  the sandbox, especially when loading untrusted pages.
+- **Chromium sandboxing.** `launch_chrome` disables Chromium's sandbox **by
+  default** — `--no-sandbox` is the standing launch configuration, not an
+  environment-specific exception (rationale in the source: Ubuntu 24.04+
+  AppArmor breaks the sandbox for unprivileged users, and the server already
+  hands its caller full page control, so the renderer sandbox is not the trust
+  boundary here). Opt in with `sandbox: true` or `CDP_SANDBOX=1` where the host
+  supports it, and understand the trade-offs in
+  [docs/chromium-sandboxing.md](./docs/chromium-sandboxing.md), especially when
+  loading untrusted pages.
 
 ## Agent-operator threat model — prompt injection → action
 
@@ -59,7 +64,9 @@ both **ingests page content** and **takes actions**, and the page can drive both
   in-page execution (`evaluate`, and `set_breakpoint` logpoints, which run
   JavaScript), DOM/form drivers (`click`, `type_text`, `press_key`, `fill`,
   `select_option`, `check`/`uncheck`), navigation (`navigate`, `reload`), and
-  `launch_chrome` (which accepts arbitrary Chrome args).
+  `launch_chrome` — which accepts arbitrary Chrome args **and** a
+  `chrome_path` naming the executable to spawn, making it an
+  arbitrary-executable launch primitive, not merely a browser starter.
 - **Host code execution (`launch_node`).** `launch_node` is a stronger surface
   than the page-scoped actions above: it spawns an agent-chosen script — with
   agent-chosen args and working directory — as a real OS child process under the
@@ -73,6 +80,17 @@ both **ingests page content** and **takes actions**, and the page can drive both
   validated, normalized, or scoped: `screenshot path=` and
   `export_storage_state path=` write, and `load_storage_state path=` reads. A
   steered agent can therefore write or read any path the server process can.
+  There is also a **fourth, indirect read route with no `path=` argument at
+  all**: `navigate` applies no URL-scheme restriction, so
+  `navigate("file:///…")` followed by `evaluate` reads any file the *browser*
+  process can — under agent control, the browser is a general-purpose file
+  reader. The page-scoped/host-scoped partition above does not survive
+  `file://`.
+- **Cookie redaction is display-only.** `get_cookies` redacts likely
+  session/auth cookie values for safe printing — a presentation choice, not a
+  confidentiality boundary. The same agent can read non-HttpOnly values via
+  `evaluate("document.cookie")` and export the full set (HttpOnly included)
+  with `export_storage_state`, as that tool's description states.
 
 This is the classic confused-deputy / prompt-injection chain: untrusted content
 in → agent → privileged action out. **Today the only mitigation is operator

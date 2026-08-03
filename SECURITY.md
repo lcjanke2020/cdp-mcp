@@ -41,7 +41,7 @@ and full read access** on every target it is attached to — and, via
   point it only at content you are authorized to inspect.
 - **Chromium sandboxing.** `launch_chrome` disables Chromium's sandbox **by
   default** — `--no-sandbox` is the standing launch configuration, not an
-  environment-specific exception (rationale in the source: Ubuntu 24.04+
+  environment-specific exception (rationale in the source: Ubuntu 23.10+
   AppArmor breaks the sandbox for unprivileged users, and the server already
   hands its caller full page control, so the renderer sandbox is not the trust
   boundary here). Opt in with `sandbox: true` or `CDP_SANDBOX=1` where the host

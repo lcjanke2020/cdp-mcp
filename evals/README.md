@@ -70,7 +70,7 @@ These exercise the form-driving and session-portability tools at the **agent** l
 | `session-resume` | `stateful-app` | `export_storage_state`, `load_storage_state`, `set_cookies`, `get_cookies` | "verifying" a resume without a real `close_session` + relaunch |
 | `cookie-redaction` | stock | `set_cookies`, `get_cookies` (redaction) | mis-classifying a `session_*` cookie as safe to log |
 
-Coverage spans all nine issue-#12 tools. (`session-resume` carries `xfailCorrectness: true` — a hedge on its long close/relaunch flow. It passed 3/3 on the first full Opus-4.8 run, but PR #17 review then tightened its oracle to require proof of the localStorage-restore path, so the tag stays until a fresh nightly re-establishes the baseline under the stricter check.) **Known L4 gap:** `load_storage_state`'s `origins_skipped` (multi-origin localStorage) path is not L4-exercised — it needs a two-origin fixture; it stays covered at L2/L3.
+Coverage spans all nine issue-#12 tools. (`session-resume` carries `xfailCorrectness: true` — a hedge on its long close/relaunch flow. It passed 3/3 on the first full Opus-4.8 run, but PR #17 review then tightened its oracle to require proof of the localStorage-restore path, so the tag stays until a fresh multi-trial run re-establishes the baseline under the stricter check.) **Known L4 gap:** `load_storage_state`'s `origins_skipped` (multi-origin localStorage) path is not L4-exercised — it needs a two-origin fixture; it stays covered at L2/L3.
 
 First full run (Opus-4.8 medium, all 14 × 3 trials, 2026-06-08, archived to durable off-repo storage): the model drove all six issue-#12 scenarios correctly. Two surfaced oracle issues (not model misses) that PR #17 review then hardened — `clearing-fill` (a false-negative answer check) and `session-resume` (a cookie-only restore could pass). Per-scenario cost ~$0.18–0.68.
 
@@ -271,7 +271,7 @@ The harness frames each scenario as **manual exploratory testing by an SDET**, n
 1. **Test plan execution (mechanic, primary).** Did the agent exercise the debugger workflow this scenario was built to test — set a breakpoint, observe a pause, inspect state, etc.? This is the "MCP under test" axis. Per-scenario gate lives in each scenario's `oracle()`.
 2. **Bug identification (correctness, secondary).** Did the agent's `finalAnswer` correctly name the bug? Pattern match over the answer text, independent of HOW the agent got there.
 
-Both bits are returned from every oracle as `OracleResult.{correctness, mechanic}`. `renderScoreboard` shows them as two columns. Per-PR `eval:quick` still gates CI exit on correctness only; nightly rotation analytics consume both for finer-grained per-(model, scenario) signal.
+Both bits are returned from every oracle as `OracleResult.{correctness, mechanic}`. `renderScoreboard` shows them as two columns. Per-PR `eval:quick` still gates CI exit on correctness only; full-suite and model-rotation analytics consume both for finer-grained per-(model, scenario) signal.
 
 ### Expected-failure scenarios (`xfailCorrectness` / `xfailMechanic`)
 

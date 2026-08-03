@@ -223,13 +223,13 @@ This avoids the 4 AM "nightly is 410'ing" page when Anthropic deprecates a model
 | L3 e2e (ARM64, primary) | every PR push, after `unit` | `e2e-linux-arm64` | ubuntu-24.04-arm | `chromium` |
 | L3 e2e (x64) | every PR push, after `unit` | `e2e-linux-x64` (matrix) | ubuntu-latest | `chromium` AND `chrome` |
 | L4 single-scenario | every PR push, after `e2e` jobs | `eval-quick` | ubuntu-24.04-arm | `chromium` |
-| L4 full | nightly cron + `workflow_dispatch` | `eval-full` | ubuntu-24.04-arm | `chromium` |
+| L4 full | `workflow_dispatch` (cost-incurring opt-in) | `eval` | ubuntu-24.04-arm | `chromium` |
 | L3 e2e (Windows, follow-on) | nightly cron, opt-in via self-hosted runner | `e2e-windows-nightly` | self-hosted Windows | `chrome` |
 | Sample-app build | reusable composite action — `vite build`, cache `examples/sample-app/dist/` | invoked by `e2e`, `eval-*` | n/a | n/a |
 
 Day 1: Windows runner mirrors `unit` only (typecheck + L1/L2). The Windows e2e nightly is a deliberate follow-on once a self-hosted runner is provisioned on the user's Windows host. Promotion criterion: **≥20 consecutive green nightlies across diverse PR loads** (not "~2 weeks of calendar time" — calendar-based gates fail when there's a quiet PR week). `continue-on-error: true` until that bar is met, then promote to gating.
 
-`ANTHROPIC_API_KEY` lives in repository secrets; `eval-quick`/`eval-full` jobs are gated on `secrets.ANTHROPIC_API_KEY != ''` so PRs from forks degrade gracefully.
+`ANTHROPIC_API_KEY` lives in repository secrets; the `eval-quick` and on-demand `eval` jobs check for it explicitly so forks and unconfigured repos degrade to a clearly labeled skip.
 
 ---
 
@@ -303,9 +303,9 @@ Day 1: Windows runner mirrors `unit` only (typecheck + L1/L2). The Windows e2e n
 ### Post-implementation (one-time gate, only when test infra first lands)
 
 5. **`npm run eval`** — the original full 8-scenario × 3-trial suite completes within budget; aggregate report shows ≥6/8 scenarios passing the majority gate. For the current 19-scenario suite, use the per-scenario thresholds and cost guidance in `evals/README.md`.
-6. **CI dry-run** — open a draft PR with a no-op change; `unit`, `e2e-linux-arm64`, `e2e-linux-x64` (chromium + chrome), `eval-quick` all complete green within ~10 min total. Manually trigger `eval-full` via `workflow_dispatch` to confirm the full path runs end-to-end.
+6. **CI dry-run** — open a draft PR with a no-op change; `unit`, `e2e-linux-arm64`, `e2e-linux-x64` (chromium + chrome), `eval-quick` all complete green within ~10 min total. Manually trigger the `eval-on-demand` workflow and confirm its `eval` job runs end-to-end.
 7. **Regression-fail check** — temporarily revert one of the multi-session compound-key fixes (the worker-collision regression noted in `store.test.ts`); confirm `worker-bug.ts` eval AND `worker.e2e.test.ts` AND L2 session-routing tests **all** fail. Restore the fix. *Do this once when the suite first lands; not on every PR.*
-8. **Cost-baseline check** — after the first nightly eval run, inspect the Anthropic dashboard; confirm cached-input rate is high (system prompt + tool list should hit the cache on every trial after the first), and that nightly cost lands within the empirical band (~$5–10 on Sonnet 4.6 baseline; first observed ~$4 on Opus-4.7-medium default — one data point, not yet a steady-state band; see *L4 → Cost gating* note above for why the pre-impl ~$45 estimate is superseded). If significantly higher than the observation, the most likely causes in priority order: (a) parallel scenario execution collapsed cache hits, (b) cache_control placement wrong on the harness's API requests, (c) thinking-effort tier silently bumped above medium.
+8. **Cost-baseline check** — after the first on-demand full eval run, inspect the Anthropic dashboard; confirm cached-input rate is high (system prompt + tool list should hit the cache on every trial after the first), and that run cost lands within the empirical band (~$5–10 on the historical Sonnet 4.6 baseline; first observed ~$4 on Opus-4.7-medium default — one data point, not yet a steady-state band; see *L4 → Cost gating* for why the pre-impl ~$45 estimate is superseded). If significantly higher than the observation, the most likely causes in priority order: (a) parallel scenario execution collapsed cache hits, (b) cache_control placement wrong on the harness's API requests, (c) thinking-effort tier silently bumped above medium.
 
 ---
 

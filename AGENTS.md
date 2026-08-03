@@ -1,6 +1,6 @@
 # AGENTS.md
 
-**Last updated: 2026-07-20**
+**Last updated: 2026-08-03**
 
 Quick-boot for AI agents (Claude Code, GitHub Copilot CLI, Codex CLI, …) dropped into this repo. Read this end-to-end before doing anything else.
 

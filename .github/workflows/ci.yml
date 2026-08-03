@@ -143,7 +143,11 @@ jobs:
             examples/sample-app/dist/
 
   eval-quick:
-    name: eval-quick (compute-step × 1 trial, opus 4.8 medium)
+    # The name carries the skip caveat because a secret-gated job that
+    # skips still reports green — without it, 40 green runs can mean 40
+    # skips. The skip path below also emits a ::warning annotation so the
+    # run page says loudly which of the two happened.
+    name: eval-quick (compute-step × 1 trial — SKIPS GREEN without ANTHROPIC_API_KEY)
     # No `needs:` — eval-quick spawns its own MCP subprocess + browser and
     # doesn't reuse e2e artifacts. Running serially after e2e-linux-arm64
     # added ~15min latency to every PR for no signal (PR #15 review).
@@ -167,7 +171,8 @@ jobs:
           KEY_PRESENT: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         run: |
           if [ "$KEY_PRESENT" != "true" ]; then
-            echo "ANTHROPIC_API_KEY is not set on this repo. Skipping eval-quick — set the secret in repo settings to enable."
+            echo "::warning title=eval-quick SKIPPED::ANTHROPIC_API_KEY is not set on this repo — this green is a SKIP, not an eval pass. Set the secret in repo settings to enable."
+            echo "## ⚠️ eval-quick SKIPPED (no ANTHROPIC_API_KEY) — green = skip, not pass" >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"

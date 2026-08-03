@@ -122,7 +122,7 @@ Both jobs gate the PR. The x86_64 `chrome` cell catches Chrome-stable-only regre
 
 **Why NOT `apt-get install chromium-browser`.** On Ubuntu 22.04+ runners, the `chromium-browser` apt package is a **snap transitional shim** — `apt install` actually pulls in the snap, which lands the binary under `/snap/bin/chromium` with all the snap-confinement issues already documented under *Critical gotchas → Snap-confined Chromium*. The CI environment then needs the same `~/snap/chromium/current/` user-data-dir workaround that local dev needs, AND the snap binary's first-run delay (a few seconds while snap warms up) introduces flake. Playwright-bundled Chromium is plain unconfined files under `~/.cache/ms-playwright/chromium-<rev>/chrome-linux/chrome` — no sandbox, no first-run cost, no apt/snap arbitration. `browser-path.ts`'s resolution order: `process.env.CDP_TEST_BROWSER_PATH` (explicit override, used in CI) → `which chromium` (local dev — includes snap path) → Playwright's bundled cache (CI default) → fail-fast with an install instruction. The CI workflow sets `CDP_TEST_BROWSER_PATH` from the Playwright cache after the install step.
 
-**CI matrix — follow-on (Windows nightly).** A self-hosted nightly Windows runner can be added later (the user has a Windows host available for this — the machine this plan was authored on). When set up, add a `e2e-windows-nightly` job triggered by the nightly cron, browser `chrome` only (Chromium on Windows is unusual). Self-hosted runner config goes in `.github/workflows/eval-nightly.yml` as a separate job; mark `continue-on-error: true` until the **≥20 consecutive green nightlies across diverse PR loads** bar (defined in the CI plan section below) is met, then promote to gating. Calendar-based gates ("two weeks") are explicitly NOT used — a quiet PR week would let an unstable runner clear the bar.
+**CI matrix — follow-on (Windows nightly).** A self-hosted nightly Windows runner can be added later (the user has a Windows host available for this — the machine this plan was authored on). When set up, add a `e2e-windows-nightly` job triggered by the nightly cron, browser `chrome` only (Chromium on Windows is unusual). Self-hosted runner config goes in `.github/workflows/eval-on-demand.yml` as a separate job; mark `continue-on-error: true` until the **≥20 consecutive green nightlies across diverse PR loads** bar (defined in the CI plan section below) is met, then promote to gating. Calendar-based gates ("two weeks") are explicitly NOT used — a quiet PR week would let an unstable runner clear the bar.
 
 **Runner.** Vitest in a **separate project** via two-entry `vitest.config.ts` (a `node` project for L1+L2, an `e2e` project for `test/e2e/**`). `npm run test:e2e` is distinct from `npm test`. Sequential (`pool: "forks", poolOptions: { forks: { singleFork: true } }`) — two specs must not fight over the same Chrome.
 
@@ -179,11 +179,11 @@ These tests **also validate the L2 fakes are faithful** — anything that passes
 - **Efficiency**: `tool_calls / oracle_minimum`, capped at 1.0. Diagnostic only — flags wasted exploration.
 - **Recovery**: count of distinct error codes in trace where the *next* tool call differs from the failing one. Diagnostic.
 
-Aggregate: pass-rate per scenario across **3 trials**, gate on **median ≥ 2/3**. Report median, not mean.
+Aggregate: pass-rate per scenario across **3 trials**, gate on **majority (≥ 2 of 3)**. Report the majority vote, not the mean.
 
-**Cost gating.** L4 full suite runs **nightly on `main`**. Per-PR runs only `compute-step` × 1 trial unless PR title contains `[full-eval]`. Cost estimate (assumptions explicit so price/model bumps don't require re-deriving).
+**Cost gating.** L4 full suite runs **on demand** (`eval-on-demand.yml`, `workflow_dispatch` only — it spends real API budget, so a scheduled nightly is a deliberate opt-in that has not been enabled). Per-PR runs only `compute-step` × 1 trial unless PR title contains `[full-eval]`. Cost estimate (assumptions explicit so price/model bumps don't require re-deriving).
 
-> **2026-05 cost reality update — empirical is the new source of truth.** The pre-implementation table below assumed Opus 4.7 at list price + the 22K output-tokens-per-trial assumption. The first real-money Sonnet 4.6 nightly came in at **~$5–10/run** vs. the table's $45/night Opus-4.7-equivalent estimate — roughly 5× under. The most likely cause is that the 90% cache-hit assumption + cached-input pricing dominate, plus the 22K output-tokens/trial figure was conservative. With the default swapped to Opus 4.7 medium-thinking (2026-05), the expected nightly is **~$20–30/run** if the same over-estimation pattern holds; the first real run will tighten this. **The numbers below are kept for the per-token derivation, not as a live source of truth — refer to actual run logs under `evals/runs/<run-id>/` and the Anthropic console for the empirical figure.**
+> **2026-05 cost reality update — empirical is the new source of truth.** The pre-implementation table below assumed Opus 4.7 at list price + the 22K output-tokens-per-trial assumption. The first real-money Sonnet 4.6 nightly came in at **~$5–10/run** vs. the table's $45/night Opus-4.7-equivalent estimate — roughly 5× under. The most likely cause is that the 90% cache-hit assumption + cached-input pricing dominate, plus the 22K output-tokens/trial figure was conservative. With the default swapped to Opus 4.7 medium-thinking (2026-05), the expected full-suite run is **~$20–30** if the same over-estimation pattern holds; the first real run will tighten this. **The numbers below are kept for the per-token derivation, not as a live source of truth — refer to actual run logs under `evals/runs/<run-id>/` and the Anthropic console for the empirical figure.**
 
 | Assumption | Value |
 |---|---|
@@ -202,16 +202,16 @@ Aggregate: pass-rate per scenario across **3 trials**, gate on **median ≥ 2/3*
 | **Pre-implementation estimate (superseded — see note above)** | ~$45/night derived; empirical ~$5–10 (Sonnet); first observed ~$4 (Opus medium, 1 data point — not yet a steady-state band) |
 | **Extended thinking** | **Now enabled by default** on adaptive-style models (Opus 4.7+) at medium effort, per the 2026-05 default-model swap. Sonnet 4.6 (budget-style, opt-in) keeps thinking off by default. Override either way via `EVAL_REASONING_LEVEL`. |
 
-If the budget feels too rich during initial calibration, drop to 2 trials per scenario (~$30) or run only 4 scenarios per night on a rotating schedule (~$22). Per-PR `eval-quick` (one scenario, one trial) is in the **~$2** range and is safe to keep on by default.
+If the budget feels too rich during initial calibration, drop to 2 trials per scenario (~$30; the strict-majority gate then requires 2/2) or run only 4 scenarios per invocation on a rotating schedule (~$22). Per-PR `eval-quick` (one scenario, one trial) is in the **~$2** range and is safe to keep on by default.
 
 **L4 parallelism: serial (single process), pinned.** The cache-hit assumption (90%) only holds if trials run *serially* — the Anthropic prompt cache is per-API-key but per-request-prefix, so multiple parallel runners building the same prefix on cold caches each pay full input price the first time. If `evals/harness/runner.ts` parallelizes scenarios across processes, cache hits collapse and the input cost is wrong by 5–10×. **Decision: scenarios run serially. Parallelism is an explicit budget tradeoff, not a default.**
 
 **Model deprecation playbook.** When the current harness pin (`claude-opus-4-8` as of 2026-07-20) is deprecated:
 1. Promote the deprecated model to a "last-known-baseline" comparison job — keep it running on its existing thresholds, but `continue-on-error: true`.
 2. Re-baseline every currently registered scenario against the candidate next-gen model: run each scenario 5× (not 3×) to get a tighter estimate, record per-scenario pass-rate. (The original suite had 8 scenarios; the current suite has 19.)
-3. Update median-gate thresholds in `evals/harness/model.ts` (typically next-gen models tighten gates, but adversarial-out-of-order may regress on more agreeable models — judge per-scenario, not en bloc).
+3. Update majority-gate thresholds in `evals/harness/model.ts` (typically next-gen models tighten gates, but adversarial-out-of-order may regress on more agreeable models — judge per-scenario, not en bloc).
 4. Promote the new model to gating; drop the comparison job after 30 days of stability.
-This avoids the 4 AM "nightly is 410'ing" page when Anthropic deprecates a model.
+This avoids discovering a retired model only after an operator triggers an expensive full-suite run.
 
 ---
 
@@ -222,14 +222,14 @@ This avoids the 4 AM "nightly is 410'ing" page when Anthropic deprecates a model
 | typecheck + L1 + L2 + smoke | every PR push | `unit` | ubuntu-24.04-arm, ubuntu-latest, windows-latest | n/a |
 | L3 e2e (ARM64, primary) | every PR push, after `unit` | `e2e-linux-arm64` | ubuntu-24.04-arm | `chromium` |
 | L3 e2e (x64) | every PR push, after `unit` | `e2e-linux-x64` (matrix) | ubuntu-latest | `chromium` AND `chrome` |
-| L4 single-scenario | every PR push, after `e2e` jobs | `eval-quick` | ubuntu-24.04-arm | `chromium` |
-| L4 full | nightly cron + `workflow_dispatch` | `eval-full` | ubuntu-24.04-arm | `chromium` |
+| L4 single-scenario | every in-repo PR push, independent of `e2e` | `eval-quick` | ubuntu-24.04-arm | `chromium` |
+| L4 full | `workflow_dispatch` (cost-incurring opt-in) | `eval` | ubuntu-24.04-arm | `chromium` |
 | L3 e2e (Windows, follow-on) | nightly cron, opt-in via self-hosted runner | `e2e-windows-nightly` | self-hosted Windows | `chrome` |
 | Sample-app build | reusable composite action — `vite build`, cache `examples/sample-app/dist/` | invoked by `e2e`, `eval-*` | n/a | n/a |
 
 Day 1: Windows runner mirrors `unit` only (typecheck + L1/L2). The Windows e2e nightly is a deliberate follow-on once a self-hosted runner is provisioned on the user's Windows host. Promotion criterion: **≥20 consecutive green nightlies across diverse PR loads** (not "~2 weeks of calendar time" — calendar-based gates fail when there's a quiet PR week). `continue-on-error: true` until that bar is met, then promote to gating.
 
-`ANTHROPIC_API_KEY` lives in repository secrets; `eval-quick`/`eval-full` jobs are gated on `secrets.ANTHROPIC_API_KEY != ''` so PRs from forks degrade gracefully.
+`ANTHROPIC_API_KEY` lives in repository secrets; the `eval-quick` and on-demand `eval` jobs check for it explicitly so forks and unconfigured repos degrade to a clearly labeled skip.
 
 ---
 
@@ -248,7 +248,7 @@ Day 1: Windows runner mirrors `unit` only (typecheck + L1/L2). The Windows e2e n
   1. `--user-data-dir=/tmp/...` is **rejected** — snap-confined apps can only write under `~/snap/<app>/current/`. The launcher helper must detect a snap path (binary lives under `/snap/`) and route `userDataDir` to `~/snap/chromium/current/lynceus-test-profile/`.
   2. `--remote-debugging-port` is honored, but the port socket lives inside the snap's namespace; `CDP.List` from the host process still works because snap maps `127.0.0.1` through, but bind failures surface as opaque "ECONNREFUSED" instead of "EADDRINUSE". Add a probe in `globalSetup` that retries port detection for ~2s before failing.
   3. The "supposedly" qualifier from the user means **don't assume snap-Chrome is present**; the resolution helper must `which`-check and emit a single actionable error if neither `/snap/bin/chromium` nor `/usr/bin/chromium` exists ("install via `sudo snap install chromium` or `sudo apt-get install chromium-browser`").
-- **LLM eval flakiness.** `temperature=0` is necessary but not sufficient. Three-trial median gate. Pin model string. Treat eval failures as signal for a model bump conversation, not a test bug.
+- **LLM eval flakiness.** `temperature=0` is necessary but not sufficient. Three-trial majority gate. Pin model string. Treat eval failures as signal for a model bump conversation, not a test bug.
 
 ---
 
@@ -264,7 +264,7 @@ Day 1: Windows runner mirrors `unit` only (typecheck + L1/L2). The Windows e2e n
 - `evals/harness/{runner,grader,trace}.ts` — Anthropic SDK harness.
 - `evals/scenarios/{compute-step,network-bug,console-error,event-binding,deep-source-map,worker-bug,adversarial-out-of-order,conditional-bp}.ts`.
 - `evals/sample-app-variants/<scenario>/` — forked sample-apps.
-- `.github/workflows/{ci.yml,eval-nightly.yml}`.
+- `.github/workflows/{ci.yml,eval-on-demand.yml}`.
 - `src/util/format.test.ts`.
 - `docs/known-chromium-gaps.md` — running list of `@chromium-skip` specs with the missing CDP method and target Chromium version that fixes it. Enforced by `scripts/check-chromium-skips.mjs` (see below).
 - `scripts/check-chromium-skips.mjs` — enforcement script for the chromium-skip policy. Greps `test/e2e/**/*.test.ts` for `@chromium-skip` tags + `it.skipIf`/`describe.skipIf` Chromium guards, parses `docs/known-chromium-gaps.md`'s table, fails (exit 1) if any skip lacks a tracking row OR any tracking row references a spec that no longer exists. Wired into `pretest:e2e` so it gates every PR run, AND exposed as `npm run lint:chromium-skips` for ad-hoc runs.
@@ -302,10 +302,10 @@ Day 1: Windows runner mirrors `unit` only (typecheck + L1/L2). The Windows e2e n
 
 ### Post-implementation (one-time gate, only when test infra first lands)
 
-5. **`npm run eval`** — the original full 8-scenario × 3-trial suite completes within budget; aggregate report shows ≥6/8 scenarios passing median. For the current 19-scenario suite, use the per-scenario thresholds and cost guidance in `evals/README.md`.
-6. **CI dry-run** — open a draft PR with a no-op change; `unit`, `e2e-linux-arm64`, `e2e-linux-x64` (chromium + chrome), `eval-quick` all complete green within ~10 min total. Manually trigger `eval-full` via `workflow_dispatch` to confirm the full path runs end-to-end.
+5. **`npm run eval`** — the original full 8-scenario × 3-trial suite completes within budget; aggregate report shows ≥6/8 scenarios passing the majority gate. For the current 19-scenario suite, use the per-scenario thresholds and cost guidance in `evals/README.md`.
+6. **CI dry-run** — open a draft PR with a no-op change; `unit`, `e2e-linux-arm64`, `e2e-linux-x64` (chromium + chrome), `eval-quick` all complete green within ~10 min total. Manually trigger the `eval-on-demand` workflow and confirm its `eval` job runs end-to-end.
 7. **Regression-fail check** — temporarily revert one of the multi-session compound-key fixes (the worker-collision regression noted in `store.test.ts`); confirm `worker-bug.ts` eval AND `worker.e2e.test.ts` AND L2 session-routing tests **all** fail. Restore the fix. *Do this once when the suite first lands; not on every PR.*
-8. **Cost-baseline check** — after the first nightly eval run, inspect the Anthropic dashboard; confirm cached-input rate is high (system prompt + tool list should hit the cache on every trial after the first), and that nightly cost lands within the empirical band (~$5–10 on Sonnet 4.6 baseline; first observed ~$4 on Opus-4.7-medium default — one data point, not yet a steady-state band; see *L4 → Cost gating* note above for why the pre-impl ~$45 estimate is superseded). If significantly higher than the observation, the most likely causes in priority order: (a) parallel scenario execution collapsed cache hits, (b) cache_control placement wrong on the harness's API requests, (c) thinking-effort tier silently bumped above medium.
+8. **Cost-baseline check** — after the first on-demand full eval run, inspect the Anthropic dashboard; confirm cached-input rate is high (system prompt + tool list should hit the cache on every trial after the first), and that run cost lands within the empirical band (~$5–10 on the historical Sonnet 4.6 baseline; first observed ~$4 on Opus-4.7-medium default — one data point, not yet a steady-state band; see *L4 → Cost gating* for why the pre-impl ~$45 estimate is superseded). If significantly higher than the observation, the most likely causes in priority order: (a) parallel scenario execution collapsed cache hits, (b) cache_control placement wrong on the harness's API requests, (c) thinking-effort tier silently bumped above medium.
 
 ---
 

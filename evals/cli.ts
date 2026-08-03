@@ -3,7 +3,7 @@
 //
 // Iterates `(scenario, trial)` pairs serially, writes NDJSON traces to
 // evals/runs/<run-id>/, prints a scoreboard at the end. Exits 0 if all
-// scenarios pass the median-correctness gate, 1 otherwise.
+// scenarios pass the majority-correctness gate, 1 otherwise.
 //
 // Serial execution is deliberate (plan rev 4 Opus N-7): the Anthropic
 // prompt cache is per-request-prefix per-API-key; parallel runners on
@@ -18,7 +18,11 @@ import {
   BudgetExceeded,
   type BudgetTracker,
 } from "./harness/runner.js";
-import { rollupScenario, renderScoreboard } from "./harness/grader.js";
+import {
+  rollupScenario,
+  renderScoreboard,
+  runPassesGate,
+} from "./harness/grader.js";
 import {
   decideEvalSandbox,
   formatSandboxHeader,
@@ -426,17 +430,21 @@ async function main(): Promise<void> {
     }
   }
 
-  // Rollup + scoreboard. Pass each scenario's xfail flags through to the
-  // rollup so XFAIL/XPASS are surfaced in place of FAIL/PASS for tagged
-  // scenarios — adversarial-out-of-order being the current example for
-  // both the correctness and (LEO-400) the mechanic axis.
-  const rollups = Object.entries(byScenario).map(([name, outcomes]) => {
-    const scenario = lookupScenario(name);
-    return rollupScenario(name, outcomes, {
-      xfailCorrectness: scenario.xfailCorrectness,
-      xfailMechanic: scenario.xfailMechanic,
+  // Rollup + scoreboard. A scenario with zero completed trials stays in the
+  // skipped list below rather than being misreported as FAIL/XFAIL. Excluding
+  // it here also keeps `rollups.length !== args.scenarios.length`, so an empty
+  // final xfail scenario cannot let the run exit green after BudgetExceeded.
+  // Pass each completed scenario's xfail flags through so XFAIL/XPASS are
+  // surfaced in place of FAIL/PASS for tagged scenarios.
+  const rollups = Object.entries(byScenario)
+    .filter(([, outcomes]) => outcomes.length > 0)
+    .map(([name, outcomes]) => {
+      const scenario = lookupScenario(name);
+      return rollupScenario(name, outcomes, {
+        xfailCorrectness: scenario.xfailCorrectness,
+        xfailMechanic: scenario.xfailMechanic,
+      });
     });
-  });
   console.log("\n" + renderScoreboard(rollups));
 
   // Surface scenarios the budget cap (or another break) prevented from
@@ -459,8 +467,7 @@ async function main(): Promise<void> {
   // fails the run. XFAIL is the expected outcome for xfail-tagged
   // scenarios; XPASS is an unexpected pass (operator should consider
   // removing the xfail tag) but does not flip the gate red.
-  const allPassed =
-    rollups.length === args.scenarios.length && rollups.every((r) => r.status !== "FAIL");
+  const allPassed = runPassesGate(rollups, args.scenarios.length);
   process.exit(allPassed ? 0 : 1);
 }
 

@@ -33,6 +33,10 @@ jobs:
       # npm@latest (now 12.x) dropped support for Node 20, which this job runs on.
       - run: npm install -g npm@^11.5.1
       - run: npm ci
+      - name: Verify release tag matches a stable package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: npm run release:check-tag
       - run: npm run build
       - run: npm test
       - run: npm publish --access public --provenance

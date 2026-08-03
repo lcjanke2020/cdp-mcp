@@ -1,6 +1,6 @@
 # src/session/
 
-**Last updated: 2026-07-20**
+**Last updated: 2026-08-03**
 
 Owns the debug-target registry and every target's mutable runtime state. A single
 lynceus process can keep one browser session and one Node Inspector session live at

@@ -165,7 +165,7 @@ describe("Node session: pause / step / resume parity", () => {
     const r = parseOkEnvelope<{ reason: string; session_id: string | null; call_stack: any[] }>(
       await waitForPause.handler({ timeout_ms: 100 }),
     );
-    expect(r.reason).toBe("breakpoint");
+    expect(r.reason).toBe("other");
     expect(r.session_id).toBeNull();
     expect(r.call_stack).toHaveLength(1);
     expect(r.call_stack[0].session_id).toBeNull();

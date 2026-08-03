@@ -79,8 +79,8 @@ export interface Scenario {
    *  approach. If unset, the runner uses its default. */
   systemPromptOverride?: string;
   /** Optional: this scenario's correctness axis is *expected* to fail.
-   *  When true, the rollup reports XFAIL (median correctness=0) or
-   *  XPASS (median correctness=1) instead of FAIL / PASS, and neither
+   *  When true, the rollup reports XFAIL (majority correctness=0) or
+   *  XPASS (majority correctness=1) instead of FAIL / PASS, and neither
    *  causes the CLI to exit nonzero. Mechanic, efficiency, and recovery
    *  axes still score normally. Used by adversarial-out-of-order, where
    *  the deliberately-degraded system prompt makes the correctness=0
@@ -89,7 +89,7 @@ export interface Scenario {
   xfailCorrectness?: boolean;
   /** Optional: this scenario's mechanic axis is *expected* to not be
    *  forced. When true, the rollup reports the mechanic column as XFAIL
-   *  (median mechanic=0) or XPASS (median mechanic=1) instead of
+   *  (majority mechanic=0) or XPASS (majority mechanic=1) instead of
    *  FAIL / PASS. Like `xfailCorrectness`, this is display-only — the
    *  mechanic axis never gates the CLI exit code regardless. Used by
    *  adversarial-out-of-order (LEO-400), where the bug is statically
@@ -299,7 +299,7 @@ export interface ReasoningConfig {
 }
 
 /** A "trial" is one (scenario, model, reasoning) run. The aggregate
- *  pass/fail per scenario is the median of multiple trials. */
+ *  pass/fail per scenario is the majority vote over multiple trials. */
 export interface TrialOutcome {
   scenario: string;
   trial: number;

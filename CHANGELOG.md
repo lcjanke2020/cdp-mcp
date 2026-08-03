@@ -7,6 +7,12 @@ the package was renamed to `lynceus` in 0.3.0 (see that entry). PR numbers refer
 
 ## [Unreleased]
 
+- **Test integrity and release truth** (#80) — the test layer is now type-checked;
+  `test:coverage` reports production `src/` coverage; eval rollups use strict
+  majorities and reject no-data runs; eval workflow names describe their actual
+  on-demand behavior; the MCP handshake derives its version from `package.json`;
+  and npm publishing rejects mismatched tags and prerelease versions targeting
+  the `latest` dist-tag.
 - **Concurrent browser + Node debugging** (LEO-115 / LEO-116 / LEO-365; #62–#72 +
   follow-up) — replaced the process-global singleton slot with a transactional
   `SessionRegistry`. One browser and one Node target can now stay live together;

@@ -6,11 +6,15 @@
 // you can catch regressions in tool registration without needing Chrome.
 
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serverPath = join(here, "..", "dist", "index.js");
+const packageVersion = JSON.parse(
+  readFileSync(join(here, "..", "package.json"), "utf8"),
+).version;
 
 const child = spawn(process.execPath, [serverPath], {
   stdio: ["pipe", "pipe", "inherit"],
@@ -55,6 +59,14 @@ const init = await send("initialize", {
   clientInfo: { name: "lynceus-smoke", version: "0.0.1" },
 });
 console.log("initialize:", init.result.serverInfo);
+if (init.result.serverInfo.version !== packageVersion) {
+  console.error(
+    `server version ${init.result.serverInfo.version} does not match package version ${packageVersion}`,
+  );
+  child.stdin.end();
+  child.kill();
+  process.exit(1);
+}
 notify("notifications/initialized");
 
 const list = await send("tools/list");

@@ -1,6 +1,6 @@
 # src/sourcemap/
 
-**Last updated: 2026-05-22**
+**Last updated: 2026-08-03**
 
 Bridges TypeScript source coordinates (what the agent sends) and JavaScript script coordinates (what CDP speaks). Source maps are loaded lazily on every `Debugger.scriptParsed`.
 

@@ -151,8 +151,8 @@ describe("makeFakeCdp — fireEvent (flatten:true two-arg shape)", () => {
     fake.on("Debugger.paused", (params: any, sessionId?: string) => {
       captured = { params, sessionId };
     });
-    fake.fireEvent("Debugger.paused", { reason: "breakpoint" }, "SW1");
-    expect(captured).toEqual({ params: { reason: "breakpoint" }, sessionId: "SW1" });
+    fake.fireEvent("Debugger.paused", { reason: "other" }, "SW1");
+    expect(captured).toEqual({ params: { reason: "other" }, sessionId: "SW1" });
   });
 
   it("for root events, the second arg is undefined (NOT omitted)", async () => {
@@ -264,7 +264,7 @@ describe("makeFakeCdp — makePauseState", () => {
   it("returns a paused state with one frame and local+global scopes by default", () => {
     const fake = makeFakeCdp();
     const s = fake.makePauseState();
-    expect(s.reason).toBe("breakpoint");
+    expect(s.reason).toBe("other");
     expect(s.callFrames).toHaveLength(1);
     expect(s.callFrames[0]?.scopeChain.map((sc) => sc.type)).toEqual(["local", "global"]);
     // objectId is counter-seeded (rev-2 fold of Opus PR #10 Nit on
@@ -309,7 +309,7 @@ describe("makeFakeCdp — close()", () => {
     let count = 0;
     fake.on("Debugger.paused", () => count++);
     await fake.close();
-    fake.fireEvent("Debugger.paused", { reason: "breakpoint" });
+    fake.fireEvent("Debugger.paused", { reason: "other" });
     expect(count).toBe(0);
   });
 });

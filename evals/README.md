@@ -1,6 +1,6 @@
 # evals/
 
-**Last updated: 2026-07-20**
+**Last updated: 2026-08-03**
 
 L4 of the test pyramid — runs an LLM agent (Claude, GPT-5.5, Gemini, …) through scripted scenarios that exercise the full MCP tool surface end-to-end against a real browser, a real Node.js Inspector child, or both concurrently. For pyramid context see [../docs/ARCHITECTURE.md §Test pyramid](../docs/ARCHITECTURE.md); for the cost model + caching guarantees see [../docs/test-eval-plan.md §L4](../docs/test-eval-plan.md).
 
@@ -70,11 +70,11 @@ These exercise the form-driving and session-portability tools at the **agent** l
 | `session-resume` | `stateful-app` | `export_storage_state`, `load_storage_state`, `set_cookies`, `get_cookies` | "verifying" a resume without a real `close_session` + relaunch |
 | `cookie-redaction` | stock | `set_cookies`, `get_cookies` (redaction) | mis-classifying a `session_*` cookie as safe to log |
 
-Coverage spans all nine issue-#12 tools. (`session-resume` carries `xfailCorrectness: true` — a hedge on its long close/relaunch flow. It passed 3/3 on the first full Opus-4.8 run, but PR #17 review then tightened its oracle to require proof of the localStorage-restore path, so the tag stays until a fresh nightly re-establishes the baseline under the stricter check.) **Known L4 gap:** `load_storage_state`'s `origins_skipped` (multi-origin localStorage) path is not L4-exercised — it needs a two-origin fixture; it stays covered at L2/L3.
+Coverage spans all nine issue-#12 tools. (`session-resume` carries `xfailCorrectness: true` — a hedge on its long close/relaunch flow. It passed 3/3 on the first full Opus-4.8 run, but PR #17 review then tightened its oracle to require proof of the localStorage-restore path, so the tag stays until a fresh multi-trial run re-establishes the baseline under the stricter check.) **Known L4 gap:** `load_storage_state`'s `origins_skipped` (multi-origin localStorage) path is not L4-exercised — it needs a two-origin fixture; it stays covered at L2/L3.
 
 First full run (Opus-4.8 medium, all 14 × 3 trials, 2026-06-08, archived to durable off-repo storage): the model drove all six issue-#12 scenarios correctly. Two surfaced oracle issues (not model misses) that PR #17 review then hardened — `clearing-fill` (a false-negative answer check) and `session-resume` (a cookie-only restore could pass). Per-scenario cost ~$0.18–0.68.
 
-**Cost gating:** `npm run eval:quick` still runs only `compute-step` (the per-PR gate stays fast/cheap). The driving scenarios run nightly via `npm run eval` — they're at temperature 1 (thinking on) so non-deterministic, and `session-resume` is the most expensive (close/relaunch). `cookie-redaction` is the cheapest/most-deterministic and is the natural candidate if a storage-path scenario is later promoted into the per-PR gate.
+**Cost gating:** `npm run eval:quick` still runs only `compute-step` (the per-PR gate stays fast/cheap). The driving scenarios run in the on-demand full suite via `npm run eval` — they're at temperature 1 (thinking on) so non-deterministic, and `session-resume` is the most expensive (close/relaunch). `cookie-redaction` is the cheapest/most-deterministic and is the natural candidate if a storage-path scenario is later promoted into the per-PR gate.
 
 ### Node scenarios (4)
 
@@ -271,7 +271,7 @@ The harness frames each scenario as **manual exploratory testing by an SDET**, n
 1. **Test plan execution (mechanic, primary).** Did the agent exercise the debugger workflow this scenario was built to test — set a breakpoint, observe a pause, inspect state, etc.? This is the "MCP under test" axis. Per-scenario gate lives in each scenario's `oracle()`.
 2. **Bug identification (correctness, secondary).** Did the agent's `finalAnswer` correctly name the bug? Pattern match over the answer text, independent of HOW the agent got there.
 
-Both bits are returned from every oracle as `OracleResult.{correctness, mechanic}`. `renderScoreboard` shows them as two columns. Per-PR `eval:quick` still gates CI exit on correctness only; nightly rotation analytics consume both for finer-grained per-(model, scenario) signal.
+Both bits are returned from every oracle as `OracleResult.{correctness, mechanic}`. `renderScoreboard` shows them as two columns. Per-PR `eval:quick` still gates CI exit on correctness only; full-suite and model-rotation analytics consume both for finer-grained per-(model, scenario) signal.
 
 ### Expected-failure scenarios (`xfailCorrectness` / `xfailMechanic`)
 
@@ -279,10 +279,10 @@ A scenario can mark an axis as **expected to fail** (the harness equivalent of p
 
 | Status   | Means (for the tagged axis)                                | Fails the run? |
 |----------|------------------------------------------------------------|----------------|
-| `PASS`   | not xfail-tagged; median=1                                 | no             |
-| `FAIL`   | not xfail-tagged; median=0                                 | corr: **yes** · mech: no |
-| `XFAIL`  | xfail-tagged; median=0 (the expected outcome)              | no             |
-| `XPASS!` | xfail-tagged; median=1 (passed the tagged axis)            | no             |
+| `PASS`   | not xfail-tagged; majority=1                               | no             |
+| `FAIL`   | not xfail-tagged; majority=0                               | corr: **yes** · mech: no |
+| `XFAIL`  | xfail-tagged; majority=0 (the expected outcome)            | no             |
+| `XPASS!` | xfail-tagged; majority=1 (passed the tagged axis)          | no             |
 
 Only a correctness `FAIL` flips the CLI exit code — **the MECHANIC column never gates**, it is diagnostic-only, so a bare mechanic `FAIL`/`XFAIL` never fails the run. The `XPASS!` marker means the tagged axis passed: for a `xfailCorrectness` tag that is an operator nudge to consider dropping it (the model unexpectedly solved a scenario designed to be hard); for a **defensive** `xfailMechanic` tag (see the 2026-07-08 note below) a steady `XPASS!` on the strong models is the *intended bonus* signal, not a drop-the-tag nudge. Efficiency and recovery axes always score normally.
 
@@ -290,7 +290,7 @@ Current tags: `adversarial-out-of-order` is tagged on **both** axes because its 
 
 **Per-model expectations (2026-05-17, first arm64-linux full run on Opus-4.7-medium).** The `adversarial-out-of-order` xfail tag was set expecting the correctness axis to fail under the degraded system prompt. In practice Opus-4.7-medium identifies the bug (correctness=1) but bypasses the debugger workflow (mechanic=0) — the "lazy solver" pattern from PR #28 — so the scenario surfaces as `XPASS!` per-run rather than `XFAIL`. We're keeping the `xfailCorrectness` tag in place because (a) the `XPASS!` marker is exactly the operator nudge we wanted, and (b) Opus's inclination to bypass the debugger is hard to suppress with prompt engineering alone — fighting the xfail axis on this one scenario isn't the right lever. The long-term answer is a different scenario class (e.g. Station BP + LLM-judged) where the agent isn't asked "find the bug" at all, so there's no shortcut to take.
 
-**Update (2026-07-08, PR #48).** Two changes revisit the paragraph above. (1) The scenario prompt was tightened to demand a *runtime* confirmation ("pause execution where the increment is computed…"), without prescribing tool ordering (that stays stripped in `MINIMAL_SYSTEM`, so the out-of-order-recovery premise survives — a 3-trial opus-4-8 run showed `recoveries=3`, confirming it didn't collapse into `compute-step`). On that run the tightened prompt moved the mechanic from 0/3 to **3/3** — so prompt engineering *did* move the axis on the current strong model, updating the 2026-05-17 "not the right lever" read for this scenario. (2) A first-class `xfailMechanic` tag was added and applied here. We keep it as a **defensive** tag rather than dropping it: the bug is a literal `return 2` readable straight from source, so no prompt can *force* the breakpoint→pause flow by construction — a sufficiently capable model may still legitimately static-shortcut. On the strong models that now drive the debugger, the steady `XPASS!` is the intended bonus signal; on the nightly rotation's weaker models (Sonnet/Haiku/GPT-5.5/older Opus) that may still shortcut, `XFAIL` reads cleaner than a bare `FAIL` in the non-gating MECHANIC column. If a future rotation shows every model reliably driving the debugger, revisit dropping the mechanic tag then.
+**Update (2026-07-08, PR #48).** Two changes revisit the paragraph above. (1) The scenario prompt was tightened to demand a *runtime* confirmation ("pause execution where the increment is computed…"), without prescribing tool ordering (that stays stripped in `MINIMAL_SYSTEM`, so the out-of-order-recovery premise survives — a 3-trial opus-4-8 run showed `recoveries=3`, confirming it didn't collapse into `compute-step`). On that run the tightened prompt moved the mechanic from 0/3 to **3/3** — so prompt engineering *did* move the axis on the current strong model, updating the 2026-05-17 "not the right lever" read for this scenario. (2) A first-class `xfailMechanic` tag was added and applied here. We keep it as a **defensive** tag rather than dropping it: the bug is a literal `return 2` readable straight from source, so no prompt can *force* the breakpoint→pause flow by construction — a sufficiently capable model may still legitimately static-shortcut. On the strong models that now drive the debugger, the steady `XPASS!` is the intended bonus signal; on the rotation's weaker models (Sonnet/Haiku/GPT-5.5/older Opus) that may still shortcut, `XFAIL` reads cleaner than a bare `FAIL` in the non-gating MECHANIC column. If a future rotation shows every model reliably driving the debugger, revisit dropping the mechanic tag then.
 
 This split was added after the 2026-05-16 Opus 4.7 measurement (PR #28) surfaced a "lazy solver" pattern: the model identified the bug correctly via `get_script_source` in every failed trial but bypassed the debugger workflow the oracles previously conflated into one PASS/FAIL bit. See PR #12 comment of 2026-05-16 for the data + framing.
 
@@ -304,7 +304,7 @@ encoded standard $3/$15 rate card (~$5.7 actual under the $2/$10 intro promo act
 2026-08-31). On the 14 browser scenarios that overlap the Opus-4.8 reference, Sonnet-5 ran **~$5.5 vs
 ~$11.9 — roughly half the cost**. It *beat* the Opus reference on both conditional-breakpoint
 scenarios (`conditional-bp`, `node-conditional-bp`, which Opus missed) and matched it on the other 12.
-The lone regression, `form-drive`, was a median-fail of shape (0,0,1) — one trial solved cleanly and
+The lone regression, `form-drive`, was a majority-fail of shape (0,0,1) — one trial solved cleanly and
 **mechanic passed all three** (the form was driven correctly; the `get_form_state` read-back just
 didn't match target on 2/3) — the same borderline shape Opus 4.8 itself showed on `conditional-bp`
 here, i.e. temp-1 variance territory, not a capability gap. `session-resume` (xfail, non-gating) was
@@ -329,7 +329,7 @@ matrix below; the two could merge.
 
 ## Active proposal — model rotation
 
-PR #12 (DRAFT, branch `agents/eval-model-rotation-proposal`) proposes day-of-week rotation across Opus 4.7 medium-thinking, Sonnet 4.6 low, Haiku 4.5, GPT-5.5 medium, Opus 4.6, Opus 4.7 no-thinking, Sonnet medium. **Per-PR-gate determinism note:** the original proposal pinned the per-PR gate to Sonnet 4.6 low for determinism; with the 2026-05 default-model swap to Opus 4.7 medium, the per-PR gate now inherits the new default (no explicit pin in CI). This trades determinism for "the gate runs the same model that nightly does" — call it out explicitly here so the rotation work doesn't silently regress the gate. Proposal doc lives on the PR branch (`docs/eval-model-rotation-proposal.md`). 8 open questions remain before implementation lands.
+PR #12 (DRAFT, branch `agents/eval-model-rotation-proposal`) proposes day-of-week rotation across Opus 4.7 medium-thinking, Sonnet 4.6 low, Haiku 4.5, GPT-5.5 medium, Opus 4.6, Opus 4.7 no-thinking, Sonnet medium. **Per-PR-gate determinism note:** the original proposal pinned the per-PR gate to Sonnet 4.6 low for determinism; with the 2026-05 default-model swap to Opus 4.7 medium, the per-PR gate now inherits the new default (no explicit pin in CI). This trades determinism for "the gate runs the same model as the full-suite workflow" — call it out explicitly here so the rotation work doesn't silently regress the gate. Proposal doc lives on the PR branch (`docs/eval-model-rotation-proposal.md`). 8 open questions remain before implementation lands.
 
 ## Adding a scenario
 

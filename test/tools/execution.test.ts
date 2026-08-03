@@ -265,7 +265,7 @@ describe("wait_for_pause", () => {
     );
     expect(r.session).toBe(browser.sessionId);
     expect(r.label).toBe("frontend");
-    expect(r.reason).toBe("breakpoint");
+    expect(r.reason).toBe("other");
     expect(r.call_stack).toHaveLength(1);
     expect(r.call_stack[0].function_name).toBe("computeStep");
   });

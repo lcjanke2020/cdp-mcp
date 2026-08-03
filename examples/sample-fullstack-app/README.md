@@ -1,6 +1,6 @@
 # examples/sample-fullstack-app/
 
-**Last updated: 2026-07-20**
+**Last updated: 2026-08-03**
 
 The human-facing full-stack demo app (LEO-464): a dev-build React frontend and an
 Express backend that talk to each other, with one deliberate bug planted server-side.

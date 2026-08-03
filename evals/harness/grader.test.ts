@@ -179,6 +179,26 @@ describe("rollupScenario", () => {
     expect(rollupScenario("s", [outcome(0)]).majorityCorrectness).toBe(0);
   });
 
+  it("zero trials never produces a passing majority on either axis", () => {
+    const r = rollupScenario("s", []);
+    expect(r.trials).toBe(0);
+    expect(r.majorityCorrectness).toBe(0);
+    expect(r.majorityMechanic).toBe(0);
+    expect(r.status).toBe("FAIL");
+    expect(r.mechanicStatus).toBe("FAIL");
+  });
+
+  it("zero trials cannot become XPASS when the scenario is xfail-tagged", () => {
+    const r = rollupScenario("s", [], {
+      xfailCorrectness: true,
+      xfailMechanic: true,
+    });
+    expect(r.majorityCorrectness).toBe(0);
+    expect(r.majorityMechanic).toBe(0);
+    expect(r.status).toBe("XFAIL");
+    expect(r.mechanicStatus).toBe("XFAIL");
+  });
+
   it("sums cost and recoveries across trials", () => {
     const r = rollupScenario("s", [outcome(1, 0.5), outcome(1, 0.75), outcome(0, 1)]);
     expect(r.totalCostUsd).toBeCloseTo(2.25, 5);

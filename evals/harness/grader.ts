@@ -150,11 +150,13 @@ export function rollupScenario(
   outcomes: TrialOutcome[],
   opts: RollupOpts = {},
 ): ScenarioRollup {
+  const hasOutcomes = outcomes.length > 0;
   const passes = outcomes.filter((o) => o.oracle.correctness === 1).length;
-  const majorityCorrectness: 0 | 1 = passes >= Math.ceil(outcomes.length / 2) ? 1 : 0;
+  const majorityCorrectness: 0 | 1 =
+    hasOutcomes && passes >= Math.ceil(outcomes.length / 2) ? 1 : 0;
   const mechanicPasses = outcomes.filter((o) => o.oracle.mechanic === 1).length;
   const majorityMechanic: 0 | 1 =
-    mechanicPasses >= Math.ceil(outcomes.length / 2) ? 1 : 0;
+    hasOutcomes && mechanicPasses >= Math.ceil(outcomes.length / 2) ? 1 : 0;
   const meanEfficiency =
     outcomes.length === 0
       ? 0

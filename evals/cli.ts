@@ -426,17 +426,21 @@ async function main(): Promise<void> {
     }
   }
 
-  // Rollup + scoreboard. Pass each scenario's xfail flags through to the
-  // rollup so XFAIL/XPASS are surfaced in place of FAIL/PASS for tagged
-  // scenarios — adversarial-out-of-order being the current example for
-  // both the correctness and (LEO-400) the mechanic axis.
-  const rollups = Object.entries(byScenario).map(([name, outcomes]) => {
-    const scenario = lookupScenario(name);
-    return rollupScenario(name, outcomes, {
-      xfailCorrectness: scenario.xfailCorrectness,
-      xfailMechanic: scenario.xfailMechanic,
+  // Rollup + scoreboard. A scenario with zero completed trials stays in the
+  // skipped list below rather than being misreported as FAIL/XFAIL. Excluding
+  // it here also keeps `rollups.length !== args.scenarios.length`, so an empty
+  // final xfail scenario cannot let the run exit green after BudgetExceeded.
+  // Pass each completed scenario's xfail flags through so XFAIL/XPASS are
+  // surfaced in place of FAIL/PASS for tagged scenarios.
+  const rollups = Object.entries(byScenario)
+    .filter(([, outcomes]) => outcomes.length > 0)
+    .map(([name, outcomes]) => {
+      const scenario = lookupScenario(name);
+      return rollupScenario(name, outcomes, {
+        xfailCorrectness: scenario.xfailCorrectness,
+        xfailMechanic: scenario.xfailMechanic,
+      });
     });
-  });
   console.log("\n" + renderScoreboard(rollups));
 
   // Surface scenarios the budget cap (or another break) prevented from

@@ -207,6 +207,13 @@ describe("load_storage_state", () => {
 });
 
 describe("get_cookies", () => {
+  it("describes redaction as display-only in model-facing metadata", () => {
+    expect(getCookies.description).toContain("Redaction is display-only");
+    expect(getCookies.description).toContain('evaluate("document.cookie")');
+    expect(getCookies.description).toContain("including HttpOnly values");
+    expect(getCookies.description).not.toContain("only through export_storage_state");
+  });
+
   it("redacts likely session/auth cookie values for display", async () => {
     const { fake } = setupSession();
     fake.respond("Network.getAllCookies", () => ({

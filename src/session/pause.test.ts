@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { PauseTracker, type PauseState } from "./pause.js";
 
-const fakeState = (reason: PauseState["reason"] = "breakpoint"): PauseState => ({
+const fakeState = (reason: PauseState["reason"] = "other"): PauseState => ({
   reason,
   callFrames: [],
   pausedAt: Date.now(),
@@ -12,7 +12,7 @@ describe("PauseTracker", () => {
     const t = new PauseTracker();
     t.onPaused(fakeState());
     const got = await t.waitForPause(1000);
-    expect(got.reason).toBe("breakpoint");
+    expect(got.reason).toBe("other");
   });
 
   it("waitForPause resolves when onPaused fires later", async () => {
@@ -28,9 +28,9 @@ describe("PauseTracker", () => {
     // Promise and registered a waiter, missing the already-buffered pause
     // and timing out instead.
     const t = new PauseTracker();
-    t.onPaused(fakeState("breakpoint"));
+    t.onPaused(fakeState("other"));
     const got = await t.waitForPauseOrResume(50);
-    expect(got?.reason).toBe("breakpoint");
+    expect(got?.reason).toBe("other");
   });
 
   it("waitForPauseOrResume returns null on timeout when no pause arrives", async () => {
@@ -55,10 +55,10 @@ describe("PauseTracker", () => {
     const t = new PauseTracker();
     const p1 = t.waitForPause(5000);
     const p2 = t.waitForPause(5000);
-    setTimeout(() => t.onPaused(fakeState("breakpoint")), 5);
+    setTimeout(() => t.onPaused(fakeState("other")), 5);
     const [r1, r2] = await Promise.all([p1, p2]);
-    expect(r1.reason).toBe("breakpoint");
-    expect(r2.reason).toBe("breakpoint");
+    expect(r1.reason).toBe("other");
+    expect(r2.reason).toBe("other");
   });
 
   it("waitForPauseCancellable removes a race loser and clears its timer", async () => {
@@ -80,8 +80,8 @@ describe("PauseTracker", () => {
   it("waitForPauseCancellable cancel is a no-op after pause already won", async () => {
     const t = new PauseTracker();
     const { promise, cancel } = t.waitForPauseCancellable(5000);
-    t.onPaused(fakeState("breakpoint"));
-    await expect(promise).resolves.toMatchObject({ reason: "breakpoint" });
+    t.onPaused(fakeState("other"));
+    await expect(promise).resolves.toMatchObject({ reason: "other" });
     expect(() => cancel()).not.toThrow();
     expect((t as any).waiters).toHaveLength(0);
   });

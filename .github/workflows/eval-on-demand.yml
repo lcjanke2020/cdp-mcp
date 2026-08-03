@@ -5,7 +5,7 @@
 #
 # Gating:
 #   - workflow_dispatch only: this eval spends real API budget, so it runs
-#     when an operator explicitly triggers it (Actions -> eval-nightly ->
+#     when an operator explicitly triggers it (Actions -> eval-on-demand ->
 #     Run workflow), never on a schedule. To run it on a nightly cron, add a
 #     `schedule:` trigger below — that is a deliberate, cost-incurring opt-in,
 #     not a default that ships enabled.
@@ -19,7 +19,7 @@
 # Budget: each run reads EVAL_BUDGET_USD (default from evals/harness/model.ts).
 # Override per-run via the budget_usd workflow input below.
 
-name: eval-nightly
+name: eval-on-demand
 
 on:
   workflow_dispatch:
@@ -41,7 +41,7 @@ on:
         default: "100"
 
 concurrency:
-  group: eval-nightly
+  group: eval-on-demand
   cancel-in-progress: false # do NOT cancel; let a previous run finish
 
 jobs:

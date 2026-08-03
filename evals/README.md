@@ -1,6 +1,6 @@
 # evals/
 
-**Last updated: 2026-07-20**
+**Last updated: 2026-08-03**
 
 L4 of the test pyramid — runs an LLM agent (Claude, GPT-5.5, Gemini, …) through scripted scenarios that exercise the full MCP tool surface end-to-end against a real browser, a real Node.js Inspector child, or both concurrently. For pyramid context see [../docs/ARCHITECTURE.md §Test pyramid](../docs/ARCHITECTURE.md); for the cost model + caching guarantees see [../docs/test-eval-plan.md §L4](../docs/test-eval-plan.md).
 
@@ -74,7 +74,7 @@ Coverage spans all nine issue-#12 tools. (`session-resume` carries `xfailCorrect
 
 First full run (Opus-4.8 medium, all 14 × 3 trials, 2026-06-08, archived to durable off-repo storage): the model drove all six issue-#12 scenarios correctly. Two surfaced oracle issues (not model misses) that PR #17 review then hardened — `clearing-fill` (a false-negative answer check) and `session-resume` (a cookie-only restore could pass). Per-scenario cost ~$0.18–0.68.
 
-**Cost gating:** `npm run eval:quick` still runs only `compute-step` (the per-PR gate stays fast/cheap). The driving scenarios run nightly via `npm run eval` — they're at temperature 1 (thinking on) so non-deterministic, and `session-resume` is the most expensive (close/relaunch). `cookie-redaction` is the cheapest/most-deterministic and is the natural candidate if a storage-path scenario is later promoted into the per-PR gate.
+**Cost gating:** `npm run eval:quick` still runs only `compute-step` (the per-PR gate stays fast/cheap). The driving scenarios run in the on-demand full suite via `npm run eval` — they're at temperature 1 (thinking on) so non-deterministic, and `session-resume` is the most expensive (close/relaunch). `cookie-redaction` is the cheapest/most-deterministic and is the natural candidate if a storage-path scenario is later promoted into the per-PR gate.
 
 ### Node scenarios (4)
 
@@ -279,10 +279,10 @@ A scenario can mark an axis as **expected to fail** (the harness equivalent of p
 
 | Status   | Means (for the tagged axis)                                | Fails the run? |
 |----------|------------------------------------------------------------|----------------|
-| `PASS`   | not xfail-tagged; median=1                                 | no             |
-| `FAIL`   | not xfail-tagged; median=0                                 | corr: **yes** · mech: no |
-| `XFAIL`  | xfail-tagged; median=0 (the expected outcome)              | no             |
-| `XPASS!` | xfail-tagged; median=1 (passed the tagged axis)            | no             |
+| `PASS`   | not xfail-tagged; majority=1                               | no             |
+| `FAIL`   | not xfail-tagged; majority=0                               | corr: **yes** · mech: no |
+| `XFAIL`  | xfail-tagged; majority=0 (the expected outcome)            | no             |
+| `XPASS!` | xfail-tagged; majority=1 (passed the tagged axis)          | no             |
 
 Only a correctness `FAIL` flips the CLI exit code — **the MECHANIC column never gates**, it is diagnostic-only, so a bare mechanic `FAIL`/`XFAIL` never fails the run. The `XPASS!` marker means the tagged axis passed: for a `xfailCorrectness` tag that is an operator nudge to consider dropping it (the model unexpectedly solved a scenario designed to be hard); for a **defensive** `xfailMechanic` tag (see the 2026-07-08 note below) a steady `XPASS!` on the strong models is the *intended bonus* signal, not a drop-the-tag nudge. Efficiency and recovery axes always score normally.
 
@@ -304,7 +304,7 @@ encoded standard $3/$15 rate card (~$5.7 actual under the $2/$10 intro promo act
 2026-08-31). On the 14 browser scenarios that overlap the Opus-4.8 reference, Sonnet-5 ran **~$5.5 vs
 ~$11.9 — roughly half the cost**. It *beat* the Opus reference on both conditional-breakpoint
 scenarios (`conditional-bp`, `node-conditional-bp`, which Opus missed) and matched it on the other 12.
-The lone regression, `form-drive`, was a median-fail of shape (0,0,1) — one trial solved cleanly and
+The lone regression, `form-drive`, was a majority-fail of shape (0,0,1) — one trial solved cleanly and
 **mechanic passed all three** (the form was driven correctly; the `get_form_state` read-back just
 didn't match target on 2/3) — the same borderline shape Opus 4.8 itself showed on `conditional-bp`
 here, i.e. temp-1 variance territory, not a capability gap. `session-resume` (xfail, non-gating) was

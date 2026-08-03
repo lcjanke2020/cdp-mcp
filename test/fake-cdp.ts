@@ -507,7 +507,10 @@ export function makeFakeCdp(): FakeCdp {
           },
         ] as unknown as Protocol.Debugger.CallFrame[]);
       return {
-        reason: opts.reason ?? "breakpoint",
+        // Real Chrome reports a user-breakpoint pause as reason "other" with
+        // `hitBreakpoints` populated — "breakpoint" is not a protocol value,
+        // and typechecking the fake is what enforces that here.
+        reason: opts.reason ?? "other",
         ...(opts.data !== undefined ? { data: opts.data } : {}),
         ...(opts.hitBreakpoints ? { hitBreakpoints: opts.hitBreakpoints } : {}),
         callFrames,

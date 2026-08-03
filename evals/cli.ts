@@ -3,7 +3,7 @@
 //
 // Iterates `(scenario, trial)` pairs serially, writes NDJSON traces to
 // evals/runs/<run-id>/, prints a scoreboard at the end. Exits 0 if all
-// scenarios pass the median-correctness gate, 1 otherwise.
+// scenarios pass the majority-correctness gate, 1 otherwise.
 //
 // Serial execution is deliberate (plan rev 4 Opus N-7): the Anthropic
 // prompt cache is per-request-prefix per-API-key; parallel runners on

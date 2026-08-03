@@ -169,14 +169,14 @@ describe("rollupScenario", () => {
     };
   }
 
-  it("median over 3 trials passes when ≥2 trials passed", () => {
-    expect(rollupScenario("s", [outcome(1), outcome(1), outcome(0)]).medianCorrectness).toBe(1);
-    expect(rollupScenario("s", [outcome(1), outcome(0), outcome(0)]).medianCorrectness).toBe(0);
+  it("majority over 3 trials passes when ≥2 trials passed", () => {
+    expect(rollupScenario("s", [outcome(1), outcome(1), outcome(0)]).majorityCorrectness).toBe(1);
+    expect(rollupScenario("s", [outcome(1), outcome(0), outcome(0)]).majorityCorrectness).toBe(0);
   });
 
   it("single-trial passes the gate iff that trial passed", () => {
-    expect(rollupScenario("s", [outcome(1)]).medianCorrectness).toBe(1);
-    expect(rollupScenario("s", [outcome(0)]).medianCorrectness).toBe(0);
+    expect(rollupScenario("s", [outcome(1)]).majorityCorrectness).toBe(1);
+    expect(rollupScenario("s", [outcome(0)]).majorityCorrectness).toBe(0);
   });
 
   it("sums cost and recoveries across trials", () => {
@@ -210,33 +210,33 @@ describe("rollupScenario — xfailCorrectness status", () => {
     };
   }
 
-  it("untagged scenario → PASS when median correctness=1", () => {
+  it("untagged scenario → PASS when majority correctness=1", () => {
     const r = rollupScenario("s", [outcome(1), outcome(1), outcome(0)]);
     expect(r.status).toBe("PASS");
     expect(r.xfailCorrectness).toBe(false);
   });
 
-  it("untagged scenario → FAIL when median correctness=0", () => {
+  it("untagged scenario → FAIL when majority correctness=0", () => {
     const r = rollupScenario("s", [outcome(0), outcome(0), outcome(1)]);
     expect(r.status).toBe("FAIL");
     expect(r.xfailCorrectness).toBe(false);
   });
 
-  it("xfail-tagged scenario → XFAIL when median correctness=0 (the expected outcome)", () => {
+  it("xfail-tagged scenario → XFAIL when majority correctness=0 (the expected outcome)", () => {
     const r = rollupScenario("s", [outcome(0), outcome(0), outcome(1)], {
       xfailCorrectness: true,
     });
     expect(r.status).toBe("XFAIL");
-    expect(r.medianCorrectness).toBe(0);
+    expect(r.majorityCorrectness).toBe(0);
     expect(r.xfailCorrectness).toBe(true);
   });
 
-  it("xfail-tagged scenario → XPASS when median correctness=1 (unexpected pass)", () => {
+  it("xfail-tagged scenario → XPASS when majority correctness=1 (unexpected pass)", () => {
     const r = rollupScenario("s", [outcome(1), outcome(1), outcome(0)], {
       xfailCorrectness: true,
     });
     expect(r.status).toBe("XPASS");
-    expect(r.medianCorrectness).toBe(1);
+    expect(r.majorityCorrectness).toBe(1);
     expect(r.xfailCorrectness).toBe(true);
   });
 
@@ -274,33 +274,33 @@ describe("rollupScenario — xfailMechanic status", () => {
     };
   }
 
-  it("untagged scenario → mechanicStatus PASS when median mechanic=1", () => {
+  it("untagged scenario → mechanicStatus PASS when majority mechanic=1", () => {
     const r = rollupScenario("s", [outcome(1), outcome(1), outcome(0)]);
     expect(r.mechanicStatus).toBe("PASS");
     expect(r.xfailMechanic).toBe(false);
   });
 
-  it("untagged scenario → mechanicStatus FAIL when median mechanic=0", () => {
+  it("untagged scenario → mechanicStatus FAIL when majority mechanic=0", () => {
     const r = rollupScenario("s", [outcome(0), outcome(0), outcome(1)]);
     expect(r.mechanicStatus).toBe("FAIL");
     expect(r.xfailMechanic).toBe(false);
   });
 
-  it("xfailMechanic-tagged → XFAIL when median mechanic=0 (static-shortcut solve, tolerated)", () => {
+  it("xfailMechanic-tagged → XFAIL when majority mechanic=0 (static-shortcut solve, tolerated)", () => {
     const r = rollupScenario("s", [outcome(0), outcome(0), outcome(1)], {
       xfailMechanic: true,
     });
     expect(r.mechanicStatus).toBe("XFAIL");
-    expect(r.medianMechanic).toBe(0);
+    expect(r.majorityMechanic).toBe(0);
     expect(r.xfailMechanic).toBe(true);
   });
 
-  it("xfailMechanic-tagged → XPASS when median mechanic=1 (drove the debugger, bonus)", () => {
+  it("xfailMechanic-tagged → XPASS when majority mechanic=1 (drove the debugger, bonus)", () => {
     const r = rollupScenario("s", [outcome(1), outcome(1), outcome(0)], {
       xfailMechanic: true,
     });
     expect(r.mechanicStatus).toBe("XPASS");
-    expect(r.medianMechanic).toBe(1);
+    expect(r.majorityMechanic).toBe(1);
     expect(r.xfailMechanic).toBe(true);
   });
 

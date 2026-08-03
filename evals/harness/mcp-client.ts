@@ -2,9 +2,9 @@
 // talks to it over stdio.
 //
 // Each trial gets its own subprocess. Isolation between trials is the
-// whole point of the multi-trial median gate — if one trial's session
+// whole point of the multi-trial majority gate — if one trial's session
 // state leaked into the next, a single bad pause or breakpoint would
-// cascade across all 3 trials and the median gate would be wrong about
+// cascade across all 3 trials and the majority gate would be wrong about
 // what it's measuring.
 //
 // The MCP SDK already ships StdioClientTransport, so we don't write our

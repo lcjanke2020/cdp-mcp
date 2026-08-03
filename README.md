@@ -221,6 +221,7 @@ The test pyramid has four layers (see [docs/test-eval-plan.md](docs/test-eval-pl
 ```sh
 npm test              # L1 unit + L2 tool-contract (fake CDP) + L4 harness-unit tests — seconds, no browser, no LLM
 npm run typecheck     # all three tsconfigs (src, evals, tests) — CI gates on this
+npm run test:coverage # production src coverage report (no threshold yet)
 npm run smoke         # stdio protocol smoke, no browser — CI gates on this
 npm run test:e2e      # L3: real headless Chromium + real Node Inspector, 20 specs
 npm run eval:quick    # L4: 1 LLM-agent scenario × 1 trial (needs ANTHROPIC_API_KEY; ~$0.50–2 at the default Opus-4.8-medium)
@@ -249,6 +250,8 @@ Decisions, not omissions — each of these was considered and deliberately not b
 - **General browser automation as a product surface.** The navigation/click/type tools exist to *reach* a bug, not to compete with the automation-first MCP servers listed under [Prior art](#prior-art).
 
 ## Out of scope for v1
+
+These are deferred platform and topology boundaries, distinct from the deliberate build-vs-adopt decisions above:
 
 Firefox / Safari, `Storage.*`, `Tracing.*`, `HeapProfiler.*`, concurrent multi-page debugging, and multi-process Node (Worker threads / `cluster` children — Worker-domain auto-attach is deferred per [`docs/node-session-design.md`](docs/node-session-design.md) §9). Single-process Node debugging **is** in scope via `attach_node` / `launch_node`.
 

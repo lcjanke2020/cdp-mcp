@@ -1,6 +1,6 @@
 # INDEX.md
 
-**Last updated: 2026-07-20**
+**Last updated: 2026-08-03**
 
 Where to find everything in this repo.
 

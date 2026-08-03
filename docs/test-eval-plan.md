@@ -183,7 +183,7 @@ Aggregate: pass-rate per scenario across **3 trials**, gate on **majority (≥ 2
 
 **Cost gating.** L4 full suite runs **on demand** (`eval-on-demand.yml`, `workflow_dispatch` only — it spends real API budget, so a scheduled nightly is a deliberate opt-in that has not been enabled). Per-PR runs only `compute-step` × 1 trial unless PR title contains `[full-eval]`. Cost estimate (assumptions explicit so price/model bumps don't require re-deriving).
 
-> **2026-05 cost reality update — empirical is the new source of truth.** The pre-implementation table below assumed Opus 4.7 at list price + the 22K output-tokens-per-trial assumption. The first real-money Sonnet 4.6 nightly came in at **~$5–10/run** vs. the table's $45/night Opus-4.7-equivalent estimate — roughly 5× under. The most likely cause is that the 90% cache-hit assumption + cached-input pricing dominate, plus the 22K output-tokens/trial figure was conservative. With the default swapped to Opus 4.7 medium-thinking (2026-05), the expected nightly is **~$20–30/run** if the same over-estimation pattern holds; the first real run will tighten this. **The numbers below are kept for the per-token derivation, not as a live source of truth — refer to actual run logs under `evals/runs/<run-id>/` and the Anthropic console for the empirical figure.**
+> **2026-05 cost reality update — empirical is the new source of truth.** The pre-implementation table below assumed Opus 4.7 at list price + the 22K output-tokens-per-trial assumption. The first real-money Sonnet 4.6 nightly came in at **~$5–10/run** vs. the table's $45/night Opus-4.7-equivalent estimate — roughly 5× under. The most likely cause is that the 90% cache-hit assumption + cached-input pricing dominate, plus the 22K output-tokens/trial figure was conservative. With the default swapped to Opus 4.7 medium-thinking (2026-05), the expected full-suite run is **~$20–30** if the same over-estimation pattern holds; the first real run will tighten this. **The numbers below are kept for the per-token derivation, not as a live source of truth — refer to actual run logs under `evals/runs/<run-id>/` and the Anthropic console for the empirical figure.**
 
 | Assumption | Value |
 |---|---|
@@ -202,7 +202,7 @@ Aggregate: pass-rate per scenario across **3 trials**, gate on **majority (≥ 2
 | **Pre-implementation estimate (superseded — see note above)** | ~$45/night derived; empirical ~$5–10 (Sonnet); first observed ~$4 (Opus medium, 1 data point — not yet a steady-state band) |
 | **Extended thinking** | **Now enabled by default** on adaptive-style models (Opus 4.7+) at medium effort, per the 2026-05 default-model swap. Sonnet 4.6 (budget-style, opt-in) keeps thinking off by default. Override either way via `EVAL_REASONING_LEVEL`. |
 
-If the budget feels too rich during initial calibration, drop to 2 trials per scenario (~$30) or run only 4 scenarios per night on a rotating schedule (~$22). Per-PR `eval-quick` (one scenario, one trial) is in the **~$2** range and is safe to keep on by default.
+If the budget feels too rich during initial calibration, drop to 2 trials per scenario (~$30; the strict-majority gate then requires 2/2) or run only 4 scenarios per invocation on a rotating schedule (~$22). Per-PR `eval-quick` (one scenario, one trial) is in the **~$2** range and is safe to keep on by default.
 
 **L4 parallelism: serial (single process), pinned.** The cache-hit assumption (90%) only holds if trials run *serially* — the Anthropic prompt cache is per-API-key but per-request-prefix, so multiple parallel runners building the same prefix on cold caches each pay full input price the first time. If `evals/harness/runner.ts` parallelizes scenarios across processes, cache hits collapse and the input cost is wrong by 5–10×. **Decision: scenarios run serially. Parallelism is an explicit budget tradeoff, not a default.**
 
@@ -211,7 +211,7 @@ If the budget feels too rich during initial calibration, drop to 2 trials per sc
 2. Re-baseline every currently registered scenario against the candidate next-gen model: run each scenario 5× (not 3×) to get a tighter estimate, record per-scenario pass-rate. (The original suite had 8 scenarios; the current suite has 19.)
 3. Update majority-gate thresholds in `evals/harness/model.ts` (typically next-gen models tighten gates, but adversarial-out-of-order may regress on more agreeable models — judge per-scenario, not en bloc).
 4. Promote the new model to gating; drop the comparison job after 30 days of stability.
-This avoids the 4 AM "nightly is 410'ing" page when Anthropic deprecates a model.
+This avoids discovering a retired model only after an operator triggers an expensive full-suite run.
 
 ---
 
@@ -222,7 +222,7 @@ This avoids the 4 AM "nightly is 410'ing" page when Anthropic deprecates a model
 | typecheck + L1 + L2 + smoke | every PR push | `unit` | ubuntu-24.04-arm, ubuntu-latest, windows-latest | n/a |
 | L3 e2e (ARM64, primary) | every PR push, after `unit` | `e2e-linux-arm64` | ubuntu-24.04-arm | `chromium` |
 | L3 e2e (x64) | every PR push, after `unit` | `e2e-linux-x64` (matrix) | ubuntu-latest | `chromium` AND `chrome` |
-| L4 single-scenario | every PR push, after `e2e` jobs | `eval-quick` | ubuntu-24.04-arm | `chromium` |
+| L4 single-scenario | every in-repo PR push, independent of `e2e` | `eval-quick` | ubuntu-24.04-arm | `chromium` |
 | L4 full | `workflow_dispatch` (cost-incurring opt-in) | `eval` | ubuntu-24.04-arm | `chromium` |
 | L3 e2e (Windows, follow-on) | nightly cron, opt-in via self-hosted runner | `e2e-windows-nightly` | self-hosted Windows | `chrome` |
 | Sample-app build | reusable composite action — `vite build`, cache `examples/sample-app/dist/` | invoked by `e2e`, `eval-*` | n/a | n/a |

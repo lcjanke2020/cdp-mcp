@@ -13,8 +13,9 @@
 // close/relaunch is unusual under a driving prompt). The first full Opus-4.8 run
 // (2026-06-08) passed it 3/3 (XPASS!), but PR #17 review then TIGHTENED this
 // oracle (require proof of the localStorage-restore path, not just cookies), so
-// that pass was under a looser check — keep the xfail hedge until a fresh nightly
-// re-establishes the baseline under the stricter oracle, then drop it.
+// that pass was under a looser check — keep the xfail hedge until a fresh
+// multi-trial run re-establishes the baseline under the stricter oracle, then
+// drop it.
 
 import type { Scenario, TraceEntry, OracleResult } from "../harness/types.js";
 import { toolPairs } from "../harness/trace.js";
@@ -126,7 +127,7 @@ export const sessionResume: Scenario = {
   oracle,
   // launch + navigate + set_cookies + export + close + launch + navigate + load + verify ≈ 9.
   oracleMinimumToolCalls: 9,
-  // Re-hedged after PR #17 tightened the oracle — drop once a nightly passes
-  // under the stricter localStorage-restore check.
+  // Re-hedged after PR #17 tightened the oracle — drop once an on-demand
+  // full-suite run passes under the stricter localStorage-restore check.
   xfailCorrectness: true,
 };

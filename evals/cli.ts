@@ -18,7 +18,11 @@ import {
   BudgetExceeded,
   type BudgetTracker,
 } from "./harness/runner.js";
-import { rollupScenario, renderScoreboard } from "./harness/grader.js";
+import {
+  rollupScenario,
+  renderScoreboard,
+  runPassesGate,
+} from "./harness/grader.js";
 import {
   decideEvalSandbox,
   formatSandboxHeader,
@@ -463,8 +467,7 @@ async function main(): Promise<void> {
   // fails the run. XFAIL is the expected outcome for xfail-tagged
   // scenarios; XPASS is an unexpected pass (operator should consider
   // removing the xfail tag) but does not flip the gate red.
-  const allPassed =
-    rollups.length === args.scenarios.length && rollups.every((r) => r.status !== "FAIL");
+  const allPassed = runPassesGate(rollups, args.scenarios.length);
   process.exit(allPassed ? 0 : 1);
 }
 

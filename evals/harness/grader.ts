@@ -145,6 +145,23 @@ export interface RollupOpts {
   xfailMechanic?: boolean;
 }
 
+/** Whether a complete set of scenario rollups passes the CLI gate.
+ *
+ * A no-data rollup never passes, including when its scenario is xfail-tagged:
+ * XFAIL describes an observed expected failure, not a trial that never ran.
+ * The expected-count check also makes scenarios omitted after a budget halt
+ * fail the run. */
+export function runPassesGate(
+  rollups: ScenarioRollup[],
+  expectedScenarioCount: number,
+): boolean {
+  return (
+    expectedScenarioCount > 0 &&
+    rollups.length === expectedScenarioCount &&
+    rollups.every((r) => r.trials > 0 && r.status !== "FAIL")
+  );
+}
+
 export function rollupScenario(
   scenarioName: string,
   outcomes: TrialOutcome[],

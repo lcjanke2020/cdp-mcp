@@ -3,7 +3,12 @@
 // filesystem.
 
 import { describe, it, expect } from "vitest";
-import { gradeTrial, rollupScenario, renderScoreboard } from "./grader.js";
+import {
+  gradeTrial,
+  rollupScenario,
+  renderScoreboard,
+  runPassesGate,
+} from "./grader.js";
 import type {
   OracleResult,
   Scenario,
@@ -215,6 +220,38 @@ describe("rollupScenario", () => {
     expect(board).toContain("FAIL");
     // Total = (3 * 0.5) + (3 * 0.3) = $2.40
     expect(board).toContain("$2.40");
+  });
+});
+
+describe("runPassesGate", () => {
+  function outcome(correctness: 0 | 1): TrialOutcome {
+    return {
+      scenario: "s",
+      trial: 1,
+      oracle: {
+        correctness,
+        mechanic: correctness,
+        efficiency: 1,
+        recovery: 0,
+        notes: "",
+      },
+      elapsedMs: 100,
+      costUsd: 1,
+      tracePath: "/tmp/x.ndjson",
+    };
+  }
+
+  it("passes only when every expected scenario produced a non-failing rollup", () => {
+    const passing = rollupScenario("s", [outcome(1)]);
+    expect(runPassesGate([passing], 1)).toBe(true);
+    expect(runPassesGate([], 1)).toBe(false);
+    expect(runPassesGate([], 0)).toBe(false);
+  });
+
+  it("rejects a zero-trial xfail rollup", () => {
+    const noData = rollupScenario("s", [], { xfailCorrectness: true });
+    expect(noData.status).toBe("XFAIL");
+    expect(runPassesGate([noData], 1)).toBe(false);
   });
 });
 

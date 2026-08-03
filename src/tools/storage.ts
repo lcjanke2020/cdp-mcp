@@ -210,7 +210,7 @@ export function registerStorageTools(server: McpServer) {
   registerJsonTool(
     server,
     "get_cookies",
-    "List cookies (via CDP, so HttpOnly cookies are included) with their flags. For safe printing, the VALUE of likely session/auth cookies is redacted (httpOnly cookies, or names matching sess/sid/token/auth/csrf/jwt/secret/api-key); only value_length is shown for those. Full values are obtainable only through export_storage_state.",
+    "List cookies (via CDP, so HttpOnly cookies are included) with their flags. For safe printing, the VALUE of likely session/auth cookies is redacted (httpOnly cookies, or names matching sess/sid/token/auth/csrf/jwt/secret/api-key); only value_length is shown for those. Redaction is display-only: same-origin non-HttpOnly values remain available to page JavaScript, including through evaluate(\"document.cookie\"); export_storage_state writes the complete cookie jar, including HttpOnly values.",
     {
       urls: z
         .array(z.string())

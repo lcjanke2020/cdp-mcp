@@ -1,6 +1,6 @@
 # Security Policy
 
-**Last updated: 2026-07-15**
+**Last updated: 2026-08-03**
 
 ## Reporting a vulnerability
 
@@ -21,7 +21,8 @@ browser **or a Node.js process**, set breakpoints, evaluate arbitrary
 expressions in page/runtime contexts, read the DOM, and capture console +
 network traffic. Treat access to this server as **equivalent to code execution
 and full read access** on every target it is attached to — and, via
-`launch_node`, on the host itself (see the agent-operator threat model below).
+`launch_node` or `launch_chrome` with a caller-selected `chrome_path`, on the
+host itself (see the agent-operator threat model below).
 
 - **stdio transport (default).** The server speaks MCP over stdin/stdout and is
   launched as a child process by the host (e.g. Claude Code). It exposes no
@@ -39,10 +40,15 @@ and full read access** on every target it is attached to — and, via
 - **Target trust.** Only attach to browsers/pages you trust. `evaluate` and the
   breakpoint/console/network tools surface page content to the calling agent;
   point it only at content you are authorized to inspect.
-- **Chromium sandboxing.** Some environments require `--no-sandbox` to launch
-  Chromium. Understand the trade-offs in
-  [docs/chromium-sandboxing.md](./docs/chromium-sandboxing.md) before disabling
-  the sandbox, especially when loading untrusted pages.
+- **Chromium sandboxing.** `launch_chrome` disables Chromium's sandbox **by
+  default** — `--no-sandbox` is the standing launch configuration, not an
+  environment-specific exception (rationale in the source: Ubuntu 23.10+
+  AppArmor breaks the sandbox for unprivileged users, and the server already
+  hands its caller full page control, so the renderer sandbox is not the trust
+  boundary here). Opt in with `sandbox: true` or `CDP_SANDBOX=1` where the host
+  supports it, and understand the trade-offs in
+  [docs/chromium-sandboxing.md](./docs/chromium-sandboxing.md), especially when
+  loading untrusted pages.
 
 ## Agent-operator threat model — prompt injection → action
 
@@ -55,24 +61,43 @@ both **ingests page content** and **takes actions**, and the page can drive both
   read tools (`locate`, `query_selector`, `get_element_html`, `get_form_state`).
   A hostile or compromised page can place text in any of these specifically to
   steer the agent.
-- **Action (what a steered agent can do).** The same agent can then act through
+- **Page/browser action (what a steered agent can do).** The same agent can act
+  through
   in-page execution (`evaluate`, and `set_breakpoint` logpoints, which run
   JavaScript), DOM/form drivers (`click`, `type_text`, `press_key`, `fill`,
   `select_option`, `check`/`uncheck`), navigation (`navigate`, `reload`), and
-  `launch_chrome` (which accepts arbitrary Chrome args).
-- **Host code execution (`launch_node`).** `launch_node` is a stronger surface
-  than the page-scoped actions above: it spawns an agent-chosen script — with
-  agent-chosen args and working directory — as a real OS child process under the
-  Node inspector, and that child inherits the server process's **full
-  environment** (any secrets in it included) and runs **unsandboxed**. A steered
-  agent able to call `launch_node` therefore has arbitrary local code execution
-  with the server's privileges, not merely page-scoped execution. (`attach_node`
-  only connects to an already-running process, but still grants full debugger
-  control — including `evaluate` — over it.)
-- **Filesystem reach.** Three tools take a caller-supplied path that is **not**
-  validated, normalized, or scoped: `screenshot path=` and
-  `export_storage_state path=` write, and `load_storage_state path=` reads. A
-  steered agent can therefore write or read any path the server process can.
+  browser launch/configuration through `launch_chrome`'s arbitrary Chrome args.
+- **Host code execution (`launch_node`, `launch_chrome chrome_path`).**
+  `launch_node` spawns an agent-chosen script — with agent-chosen args and
+  working directory — as a real OS child process under the Node inspector. That
+  child inherits the server process's **full environment** (any secrets in it
+  included) and runs **unsandboxed**. Separately, `launch_chrome` accepts a
+  caller-selected `chrome_path`: chrome-launcher passes that path to the OS as
+  the executable to spawn with the server's privileges, even though it supplies
+  browser flags. It is therefore another host-execution primitive, not a
+  page-scoped action; removing only `launch_node` from an allowlist does not
+  remove host process launch. (`attach_node` only connects to an already-running
+  process, but still grants full debugger control — including `evaluate` — over
+  it.)
+- **Filesystem reach.** Beyond the `chrome_path` executable selection above,
+  several inputs accept caller-supplied filesystem locations that are **not**
+  validated, normalized, or scoped. `screenshot path=` and
+  `export_storage_state path=` write caller-selected files, while
+  `load_storage_state path=` reads one. `launch_chrome user_data_dir=` asks
+  Chrome to create and write its profile tree in a caller-selected directory;
+  unlike the `path=` tools, that write uses Chrome's own profile layout rather
+  than arbitrary caller-selected contents or filenames. Separately, `navigate`
+  has an **indirect read route with no `path=` argument at all**: it applies no
+  URL-scheme restriction, so
+  `navigate("file:///…")` followed by `evaluate` reads any file the *browser*
+  process can — under agent control, the browser is a general-purpose file
+  reader. The page-scoped/host-scoped partition above does not survive
+  `file://`.
+- **Cookie redaction is display-only.** `get_cookies` redacts likely
+  session/auth cookie values for safe printing — a presentation choice, not a
+  confidentiality boundary. The same agent can read non-HttpOnly values via
+  `evaluate("document.cookie")` and export the full set (HttpOnly included)
+  with `export_storage_state`, as that tool's description states.
 
 This is the classic confused-deputy / prompt-injection chain: untrusted content
 in → agent → privileged action out. **Today the only mitigation is operator
@@ -92,12 +117,15 @@ These are deployment-side controls; the server does not apply them for you.
   [docs/chromium-sandboxing.md](./docs/chromium-sandboxing.md) for the mechanics
   and the important caveat that an outer sandbox does **not** replace Chromium's
   own renderer sandbox.
-- **Scope the writable filesystem.** Because the `path=` tools are unscoped, run
-  the server with a restricted writable FS (container mount, Bubblewrap bind, or
-  a dedicated low-privilege user) so those writes/reads cannot escape an intended
-  directory or reach credentials and SSH keys.
-- **Throwaway browser profile.** Use a disposable `userDataDir` rather than a
-  real browser profile.
+- **Scope readable and writable filesystem access.** Because both the `path=`
+  tools and unrestricted `file://` navigation are unscoped, give the server and
+  any browser it launches a restricted filesystem view (container mount
+  allowlist, Bubblewrap bind policy, or a dedicated low-privilege user). A
+  write-only restriction does not protect credentials or SSH keys that the
+  browser process can read. An attached browser does not inherit the server's
+  containment; confine that process separately.
+- **Throwaway browser profile.** Pass `launch_chrome user_data_dir=` pointing to
+  a disposable directory rather than a real browser profile.
 - **No ambient credentials.** Do not run the server where its process env or
   instance role carries cloud/API credentials the agent shouldn't have — doubly
   load-bearing because a `launch_node` child inherits that env directly. Block the

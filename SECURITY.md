@@ -21,7 +21,8 @@ browser **or a Node.js process**, set breakpoints, evaluate arbitrary
 expressions in page/runtime contexts, read the DOM, and capture console +
 network traffic. Treat access to this server as **equivalent to code execution
 and full read access** on every target it is attached to — and, via
-`launch_node`, on the host itself (see the agent-operator threat model below).
+`launch_node` or `launch_chrome` with a caller-selected `chrome_path`, on the
+host itself (see the agent-operator threat model below).
 
 - **stdio transport (default).** The server speaks MCP over stdin/stdout and is
   launched as a child process by the host (e.g. Claude Code). It exposes no
@@ -60,22 +61,24 @@ both **ingests page content** and **takes actions**, and the page can drive both
   read tools (`locate`, `query_selector`, `get_element_html`, `get_form_state`).
   A hostile or compromised page can place text in any of these specifically to
   steer the agent.
-- **Action (what a steered agent can do).** The same agent can then act through
+- **Page/browser action (what a steered agent can do).** The same agent can act
+  through
   in-page execution (`evaluate`, and `set_breakpoint` logpoints, which run
   JavaScript), DOM/form drivers (`click`, `type_text`, `press_key`, `fill`,
   `select_option`, `check`/`uncheck`), navigation (`navigate`, `reload`), and
-  `launch_chrome` — which accepts arbitrary Chrome args **and** a
-  `chrome_path` naming the executable to spawn, making it an
-  arbitrary-executable launch primitive, not merely a browser starter.
-- **Host code execution (`launch_node`).** `launch_node` is a stronger surface
-  than the page-scoped actions above: it spawns an agent-chosen script — with
-  agent-chosen args and working directory — as a real OS child process under the
-  Node inspector, and that child inherits the server process's **full
-  environment** (any secrets in it included) and runs **unsandboxed**. A steered
-  agent able to call `launch_node` therefore has arbitrary local code execution
-  with the server's privileges, not merely page-scoped execution. (`attach_node`
-  only connects to an already-running process, but still grants full debugger
-  control — including `evaluate` — over it.)
+  browser launch/configuration through `launch_chrome`'s arbitrary Chrome args.
+- **Host code execution (`launch_node`, `launch_chrome chrome_path`).**
+  `launch_node` spawns an agent-chosen script — with agent-chosen args and
+  working directory — as a real OS child process under the Node inspector. That
+  child inherits the server process's **full environment** (any secrets in it
+  included) and runs **unsandboxed**. Separately, `launch_chrome` accepts a
+  caller-selected `chrome_path`: chrome-launcher passes that path to the OS as
+  the executable to spawn with the server's privileges, even though it supplies
+  browser flags. It is therefore another host-execution primitive, not a
+  page-scoped action; removing only `launch_node` from an allowlist does not
+  remove host process launch. (`attach_node` only connects to an already-running
+  process, but still grants full debugger control — including `evaluate` — over
+  it.)
 - **Filesystem reach.** Three tools take a caller-supplied path that is **not**
   validated, normalized, or scoped: `screenshot path=` and
   `export_storage_state path=` write, and `load_storage_state path=` reads. A
